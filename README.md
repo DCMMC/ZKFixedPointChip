@@ -56,3 +56,9 @@ Decision Tree (Inference & Training):
 ```bash
 cargo run --example decision_tree
 ```
+
+## Benchmark
+
+![benchmark](./figure/benchmark.png)
+
+> The complexity of decision tree training is proportional to $2^d$ where $d$ is the tree depth.
