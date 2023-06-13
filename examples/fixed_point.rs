@@ -54,6 +54,7 @@ fn some_algorithm_in_zk<F: ScalarField>(
     }
 
     let sin_x = fixed_point_chip.qsin(ctx, x);
+    println!("sin_x_q: {:?}", *sin_x.value());
     let y_decimal_3 = fixed_point_chip.dequantization(*sin_x.value());
     let y_native_3 = x_decimal.sin();
     println!(
@@ -71,20 +72,20 @@ fn main() {
     set_var("DEGREE", 13.to_string());
 
     // run mock prover
-    mock(some_algorithm_in_zk, -12.0);
-    mock(some_algorithm_in_zk, -1.88724767676867);
-    mock(some_algorithm_in_zk, 0.0);
-    mock(some_algorithm_in_zk, 1.0);
-    mock(some_algorithm_in_zk, 1.128136);
-    mock(some_algorithm_in_zk, 2.0);
-    mock(some_algorithm_in_zk, 4.0);
-    mock(some_algorithm_in_zk, 2.0 * std::f64::consts::PI);
+    // mock(some_algorithm_in_zk, -12.0);
+    // mock(some_algorithm_in_zk, -1.88724767676867);
+    // mock(some_algorithm_in_zk, 0.0);
+    // mock(some_algorithm_in_zk, 1.0);
+    // mock(some_algorithm_in_zk, 1.128);
+    // mock(some_algorithm_in_zk, 2.0);
+    // mock(some_algorithm_in_zk, 4.0);
+    mock(some_algorithm_in_zk, 0.25 * std::f64::consts::PI);
 
     // uncomment below to run actual prover:
     // the 3rd parameter is a dummy input to provide for the proving key generation
     prove(
         some_algorithm_in_zk,
-        5.289787786,
-        0.52897877867479988
+        0.25 * std::f64::consts::PI,
+        0.5 * std::f64::consts::PI
     );
 }
