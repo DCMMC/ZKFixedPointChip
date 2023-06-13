@@ -1,6 +1,6 @@
 # ZKFixedPointChip
 
-ZK Fixed Point Arithmetic with its Application in Machine Learning based on [Halo2](https://github.com/privacy-scaling-explorations/halo2.git) & Axoim's [Halo2-base](https://github.com/axiom-crypto/halo2-lib).
+ZK Fixed Point Arithmetic with its Application in Machine Learning based on [Halo2](https://github.com/privacy-scaling-explorations/halo2.git) & Axiom's [Halo2-base](https://github.com/axiom-crypto/halo2-lib).
 
 ## Features
 
