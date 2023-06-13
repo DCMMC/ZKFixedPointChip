@@ -57,8 +57,14 @@ Decision Tree (Inference & Training):
 cargo run --example decision_tree
 ```
 
+> For visualizing, you should install `graphviz` and the generated `svg` file is located in `./figure/dt.svg`.
+
 ## Benchmark
 
 ![benchmark](./figure/benchmark.png)
 
 > The complexity of decision tree training is proportional to $2^d$ where $d$ is the tree depth.
+
+## Decision Tree Visualization
+
+![dt](./figure/dt.svg)

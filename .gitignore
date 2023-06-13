@@ -20,3 +20,4 @@ fitted.txt
 *.ipynb
 log.txt
 log-zk.txt
+.DS_Store

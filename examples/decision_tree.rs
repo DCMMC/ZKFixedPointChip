@@ -6,7 +6,22 @@ use halo2_scaffold::gadget::decision_tree::DecisionTreeChip;
 use halo2_scaffold::scaffold::{mock, prove};
 use itertools::Itertools;
 use num_traits::ToPrimitive;
+use std::collections::HashSet;
 use std::env::{var, set_var};
+use std::process::{Command, Stdio};
+
+pub fn dot2svg(dot: &str) {
+    let dot = Command::new("echo").arg(dot).stdout(Stdio::piped()).spawn().unwrap();
+    let svg = Command::new("dot")
+            .arg("-Tsvg")
+            .stdin(Stdio::from(dot.stdout.unwrap()))
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+    let output = svg.wait_with_output().unwrap();
+    let result = std::str::from_utf8(&output.stdout).unwrap();
+    std::fs::write("./figure/dt.svg", result).expect("Unable to write file");
+}
 
 pub fn train<F: ScalarField>(
     ctx: &mut Context<F>,
@@ -29,19 +44,49 @@ pub fn train<F: ScalarField>(
     let num_feature = 2;
     let num_class = 2;
     let max_depth = 4;
-    let min_size = 1;
+    let min_size = 2;
 
     let tree = chip.train(ctx, x_deq, y_adv, num_feature, num_class, max_depth, min_size);
     println!("decision tree:");
-    let cnt = tree.iter().copied().map(|x| fe_to_biguint(x.value()).to_u128().unwrap()).collect::<Vec<u128>>().chunks(5).into_iter().inspect(
-        |x| {
+    let mut dt_dot = "digraph G {\n  graph [ordering=\"out\"];\n".to_string();
+    let mut leaf_nodes = HashSet::new();
+    let cnt = tree.iter().copied().map(
+        |x| fe_to_biguint(x.value()).to_u128().unwrap()
+    ).collect::<Vec<u128>>().chunks(5).into_iter().enumerate().inspect(
+        |(node_idx, x)| {
             let mut node = x.clone().iter().copied().map(|x| x as f64).collect_vec();
+            let parent_idx = (*node_idx as i32 + 1) / 2 - 1;
             if node[node.len() - 1] == 255.0 {
                 node[1] = chip.chip.dequantization(F::from_u128(node[1] as u128));
+                dt_dot.push_str(&format!(
+                    "  node{} [label=<X<SUB>{}</SUB> &lt; {:.2}>,style=\"filled,rounded\",shape=\"box\",fillcolor=\"palegreen\"]\n",
+                    node_idx, node[0], node[1]
+                ));
+                if node_idx > &0 {
+                    dt_dot.push_str(&format!("  node{} -> node{}\n", parent_idx, node_idx));
+                }
+            } else {
+                if leaf_nodes.contains(&(parent_idx as usize)) {
+                    dt_dot.push_str(&format!(
+                        "  node{} [label=\"{}\",style=\"dashed,filled\",shape=\"circle\",fillcolor=\"cadetblue1\"]\n",
+                        node_idx, node[node.len() - 1]
+                    ));
+                    dt_dot.push_str(&format!("  node{} -> node{} [style=\"dashed\"]\n", parent_idx, node_idx));
+                } else {
+                    dt_dot.push_str(&format!(
+                        "  node{} [label=\"{}\",style=\"filled\",shape=\"circle\",fillcolor=\"yellow\"]\n",
+                        node_idx, node[node.len() - 1]
+                    ));
+                    dt_dot.push_str(&format!("  node{} -> node{}\n", parent_idx, node_idx));
+                }
+                leaf_nodes.insert(*node_idx);
             }
             println!("{:?}", node);
         }).count();
+    dt_dot.push_str("}\n");
     println!("#nodes: {:?}", cnt);
+    // println!("dot: {}", dt_dot);
+    dot2svg(&dt_dot);
 
     make_public.extend(tree);
 }
