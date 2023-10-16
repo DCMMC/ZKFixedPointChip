@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use halo2_base::QuantumCell::{Constant, Existing, Witness};
 use halo2_base::{
     gates::{range::RangeStrategy, GateChip, GateInstructions, RangeChip, RangeInstructions},
@@ -32,7 +31,7 @@ pub struct FixedPointChip<F: BigPrimeField, const PRECISION_BITS: u32> {
 
 impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BITS> {
     pub fn new(strategy: FixedPointStrategy, lookup_bits: usize) -> Self {
-        // Ashutosh: 254/4 = 63.5
+        // Note 254/4 = 63.5
         assert!(PRECISION_BITS <= 63, "support only precision bits <= 63");
         assert!(PRECISION_BITS >= 32, "support only precision bits >= 32");
         let gate = RangeChip::new(
@@ -48,7 +47,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BI
         let quantization_scale = F::from_u128(2u128.pow(PRECISION_BITS as u32));
         // Becuase BN254 is cyclic, negative number will be denoted as (-x) % m = m - x where m = 2^254,
         // in this chip, we treat all x > negative_point as a negative numbers.
-        // Ashutosh: most likely just P-1 for the field
+        // P-1 for the field
         let bn254_max = biguint_to_fe(
             &BigUint::parse_bytes(&F::MODULUS[2..].bytes().collect::<Vec<u8>>(), 16)
                 .unwrap()
@@ -104,7 +103,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BI
     pub fn dequantization(&self, x: F) -> f64 {
         let mut x_mut = x;
         let negative = if x > self.negative_point {
-            x_mut = self.bn254_max - x - F::one(); // Ashutosh: shouldn't this be +F::one()
+            x_mut = self.bn254_max - x - F::one(); // Shouldn't this be +F::one()?
             -1f64
         } else {
             1f64
@@ -625,7 +624,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         // for quantised a and b - call them a_q= a.S, b_q= b.S
         // "quantised" ab above is = (ab).S^2
         // need to divide this by S to get the correct result
-        // Ashutosh: this step can be batched for multiple multiplications I think- like inner product
+        // This step can be batched for multiple multiplications- like inner product
         let (res, _) = self.signed_div_scale(ctx, ab);
 
         res
@@ -995,7 +994,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
-    // just verify y*y = x
+    // Could be better to just verify y*y = x
     fn qsqrt(&self, ctx: &mut Context<F>, x: impl Into<QuantumCell<F>>) -> AssignedValue<F>
     where
         F: BigPrimeField,
@@ -1004,64 +1003,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         self.qpow(ctx, x, half)
     }
 
-    // ORIGINAL VERSION
-    // // This shifts things by 2^precision to the right- useful after multiplying two things
-    // // uses
-    // fn signed_div_scale(
-    //     &self,
-    //     ctx: &mut Context<F>,
-    //     a: impl Into<QuantumCell<F>>,
-    // ) -> (AssignedValue<F>, AssignedValue<F>) {
-    //     // a = b * q + r, r in [0, b), q in [-2^n, 2^n]
-    //     let a = a.into();
-    //     // b = 2^p
-    //     let b = fe_to_biguint(&self.quantization_scale);
-    //     // 252 = 63 * 4
-    //     // the raw result of multiplying two positive or negative numbers is at most 252 bit
-    //     // similarly the raw result of multiplying two oppositely signed numbers is p - (something 252 bit)
-    //     // p is at least 254 bit- I think
-    //     // 2^254-2^252 > 2^252
-    //     // is_neg only on BigInt - so not costly yet
-    //     // because of the above reasoning this correctly calculates whether a is supposed to be negative or not
-    //     let a_is_neg = fe_to_biguint(a.value()) > BigUint::from(2u32).pow(252u32);
-    //     let (q, r) = if a_is_neg {
-    //         let a_abs = fe_to_biguint(&(self.bn254_max - a.value() + F::one()));
-    //         let q = fe_to_biguint(&self.bn254_max) - a_abs.div_ceil(&b) + BigUint::from(1u32);
-    //         let r = fe_to_biguint::<F>(a.value())
-    //             - fe_to_biguint::<F>(
-    //                 &(biguint_to_fe::<F>(&b.clone()) * biguint_to_fe::<F>(&q.clone())),
-    //             );
-    //         // assert!(*a.value() == biguint_to_fe::<F>(&b) * biguint_to_fe::<F>(&q) + biguint_to_fe::<F>(&r));
-    //         (q, r)
-    //     } else {
-    //         fe_to_biguint(a.value()).div_mod_floor(&b)
-    //     };
-    //     // up to this point no constraints have been added; so none of this costs anything
-    //     ctx.assign_region(
-    //         [
-    //             Witness(biguint_to_fe(&r)),
-    //             Constant(biguint_to_fe(&b)),
-    //             Witness(biguint_to_fe(&q)),
-    //             a,
-    //         ],
-    //         [0],
-    //     );
-    //     let rem = ctx.get(-4);
-    //     let div = ctx.get(-2);
-
-    //     self.range_gate().check_big_less_than_safe(ctx, rem, b);
-    //     // a < 2^{4p}, b = 2^p, so |q| < 2^{3p}
-    //     let bound = BigUint::from(2u32).pow(PRECISION_BITS * 3 as u32);
-    //     let div_abs = self.qabs(ctx, div); // very costly!!!
-    //     self.range_gate().check_big_less_than_safe(ctx, div_abs, bound);
-
-    //     (div, rem)
-    // }
-
-    // EXPERIMENTAL- THIS VERSION GETS RID OF QABS CALL
-    // with this change it requires ~94 cells per qmul
-    // This shifts things by 2^precision to the right- useful after multiplying two things
-    // uses
+    /// This shifts things by 2^precision to the right- useful after multiplying two things
     fn signed_div_scale(
         &self,
         ctx: &mut Context<F>,
@@ -1124,5 +1066,3 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         (div, rem)
     }
 }
-
-// https://hackmd.io/@DCMMC/rkWN6gw7i
