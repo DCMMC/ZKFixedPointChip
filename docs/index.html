@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZKFixedPointChip — Mathematical Foundations of Halo2 &amp; ZK Machine Learning</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '$', right: '$', display: false}
+    ],
+    throwOnError: false
+  });"></script>
+<style>
+:root, [data-theme="light"] {
+  --bg: #fafaf9;
+  --fg: #1c1917;
+  --accent: #7c3aed;
+  --accent2: #2563eb;
+  --surface: #ffffff;
+  --border: #e7e5e4;
+  --dim: #78716c;
+  --code-bg: #f5f5f4;
+  --highlight: #fef3c7;
+  --success: #059669;
+  --info-bg: #eff6ff;
+  --info-border: #93c5fd;
+  --warn-bg: #fffbeb;
+  --warn-border: #fcd34d;
+  --sidebar-bg: #f5f5f4;
+  --sidebar-hover: #e7e5e4;
+  --toggle-bg: #e7e5e4;
+  --toggle-fg: #1c1917;
+}
+
+[data-theme="dark"] {
+  --bg: #0c0a09;
+  --fg: #e7e5e4;
+  --accent: #a78bfa;
+  --accent2: #60a5fa;
+  --surface: #1c1917;
+  --border: #292524;
+  --dim: #a8a29e;
+  --code-bg: #1c1917;
+  --highlight: #422006;
+  --info-bg: #172554;
+  --info-border: #1e40af;
+  --warn-bg: #422006;
+  --warn-border: #92400e;
+  --sidebar-bg: #1c1917;
+  --sidebar-hover: #292524;
+  --toggle-bg: #292524;
+  --toggle-fg: #e7e5e4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0a09;
+    --fg: #e7e5e4;
+    --accent: #a78bfa;
+    --accent2: #60a5fa;
+    --surface: #1c1917;
+    --border: #292524;
+    --dim: #a8a29e;
+    --code-bg: #1c1917;
+    --highlight: #422006;
+    --info-bg: #172554;
+    --info-border: #1e40af;
+    --warn-bg: #422006;
+    --warn-border: #92400e;
+    --sidebar-bg: #1c1917;
+    --sidebar-hover: #292524;
+    --toggle-bg: #292524;
+    --toggle-fg: #e7e5e4;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+  scroll-padding-top: 20px;
+}
+
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.75;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* --- Sidebar TOC --- */
+nav.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  width: 260px;
+  min-width: 260px;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  padding: 1.2rem 0;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.82rem;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+nav.sidebar .sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.6rem;
+}
+nav.sidebar .sidebar-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+}
+nav.sidebar ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+nav.sidebar li { margin: 0; }
+nav.sidebar > ol > li > ol {
+  padding: 0;
+  margin: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+nav.sidebar > ol > li.expanded > ol {
+  max-height: 500px;
+}
+nav.sidebar > ol > li > ol > li > a {
+  padding-left: 2rem;
+  font-size: 0.78rem;
+  color: var(--dim);
+}
+nav.sidebar > ol > li > ol > li > a:hover {
+  color: var(--accent);
+}
+nav.sidebar > ol > li > ol > li > a.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-left-color: var(--accent);
+}
+nav.sidebar a {
+  display: block;
+  padding: 0.35rem 1rem;
+  color: var(--fg);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  border-left: 3px solid transparent;
+}
+nav.sidebar a:hover {
+  background: var(--sidebar-hover);
+  color: var(--accent);
+}
+nav.sidebar a.active {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--sidebar-hover);
+}
+nav.sidebar .new-badge {
+  font-size: 0.65rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  margin-left: 0.3em;
+  vertical-align: middle;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* --- Theme Toggle --- */
+.theme-toggle {
+  background: var(--toggle-bg);
+  border: 1px solid var(--border);
+  color: var(--toggle-fg);
+  cursor: pointer;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
+}
+.theme-toggle .icon-sun,
+.theme-toggle .icon-moon { display: none; }
+/* Show sun in dark mode, moon in light */
+[data-theme="dark"] .theme-toggle .icon-sun { display: inline; }
+[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+[data-theme="light"] .theme-toggle .icon-moon { display: inline; }
+/* Default (no data-theme): follow system */
+:root:not([data-theme]) .theme-toggle .icon-moon { display: inline; }
+:root:not([data-theme]) .theme-toggle .icon-sun { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-toggle .icon-moon { display: none; }
+  :root:not([data-theme]) .theme-toggle .icon-sun { display: inline; }
+}
+
+/* --- Main content --- */
+main.content {
+  flex: 1;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 2rem 2rem 6rem;
+  min-width: 0;
+}
+
+/* --- Mobile sidebar toggle --- */
+.sidebar-toggle {
+  display: none;
+  position: fixed;
+  bottom: 1.2rem;
+  left: 1.2rem;
+  z-index: 200;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  nav.sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    width: 270px;
+    min-width: 270px;
+    transition: left 0.25s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+  }
+  nav.sidebar.open {
+    left: 0;
+  }
+  .sidebar-toggle {
+    display: flex;
+  }
+  main.content {
+    padding: 1.5rem 1rem 6rem;
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 99;
+  }
+  .sidebar-overlay.open {
+    display: block;
+  }
+}
+
+/* --- Headings --- */
+h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.3rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+h1 + .subtitle {
+  font-size: 1.05rem;
+  color: var(--dim);
+  margin-bottom: 2.5rem;
+  font-style: italic;
+}
+h2 {
+  font-size: 1.55rem;
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--accent);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+h3 {
+  font-size: 1.2rem;
+  margin-top: 2rem;
+  margin-bottom: 0.7rem;
+  color: var(--accent);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+h4 {
+  font-size: 1rem;
+  margin-top: 1.4rem;
+  margin-bottom: 0.5rem;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* --- Text --- */
+p { margin-bottom: 1rem; }
+ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+li { margin-bottom: 0.3rem; }
+strong { font-weight: 700; }
+em { font-style: italic; }
+
+a { color: var(--accent2); }
+
+/* --- Boxes --- */
+.definition, .theorem, .example-box, .info-box, .warn-box {
+  border-left: 4px solid var(--accent);
+  background: var(--surface);
+  padding: 1rem 1.2rem;
+  margin: 1.2rem 0;
+  border-radius: 0 6px 6px 0;
+}
+.definition .label, .theorem .label {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.theorem { border-left-color: var(--success); }
+.theorem .label { color: var(--success); }
+.example-box { border-left-color: var(--accent2); }
+.example-box .label { color: var(--accent2); font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.4rem; }
+.info-box {
+  border-left-color: var(--info-border);
+  background: var(--info-bg);
+}
+.warn-box {
+  border-left-color: var(--warn-border);
+  background: var(--warn-bg);
+}
+
+/* --- Code --- */
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+pre {
+  background: var(--code-bg);
+  padding: 1rem 1.2rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+pre code { background: none; padding: 0; }
+
+/* --- Tables --- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.92rem;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+}
+th {
+  background: var(--surface);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+}
+
+/* --- Figures --- */
+figure {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+figcaption {
+  font-size: 0.85rem;
+  color: var(--dim);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* --- Diagram --- */
+.diagram {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre;
+}
+.diagram svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+.diagram-svg {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1.5rem 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.diagram-svg svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* --- KaTeX display --- */
+.katex-display { margin: 1.2rem 0; overflow-x: auto; overflow-y: hidden; }
+
+/* --- Separator --- */
+hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+/* --- Footer --- */
+footer {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--dim);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar overlay for mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Left Sidebar TOC -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-title">Contents</span>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark theme">
+      <span class="icon-sun">&#9728;</span>
+      <span class="icon-moon">&#9789;</span>
+    </button>
+  </div>
+  <ol>
+    <li><a href="#s1" onclick="closeSidebar()">1. Finite Fields</a>
+      <ol>
+        <li><a href="#s1-1" onclick="closeSidebar()">1.1 Cyclic Groups</a></li>
+        <li><a href="#s1-2" onclick="closeSidebar()">1.2 Extension Fields</a></li>
+      </ol>
+    </li>
+    <li><a href="#s2" onclick="closeSidebar()">2. Elliptic Curves</a>
+      <ol>
+        <li><a href="#s2-1" onclick="closeSidebar()">2.1 The Curve Equation</a></li>
+        <li><a href="#s2-2" onclick="closeSidebar()">2.2 The Group Law</a></li>
+        <li><a href="#s2-3" onclick="closeSidebar()">2.3 Scalar Multiplication &amp; ECDLP</a></li>
+      </ol>
+    </li>
+    <li><a href="#s3" onclick="closeSidebar()">3. Elliptic Curve Pairings</a>
+      <ol>
+        <li><a href="#s3-1" onclick="closeSidebar()">3.1 Bilinear Maps</a></li>
+        <li><a href="#s3-2" onclick="closeSidebar()">3.2 Why Pairings Matter</a></li>
+      </ol>
+    </li>
+    <li><a href="#s4" onclick="closeSidebar()">4. Polynomial Commitments (KZG)</a>
+      <ol>
+        <li><a href="#s4-1" onclick="closeSidebar()">4.1 Trusted Setup (SRS)</a></li>
+        <li><a href="#s4-2" onclick="closeSidebar()">4.2 Commit</a></li>
+        <li><a href="#s4-3" onclick="closeSidebar()">4.3 Open and Verify</a></li>
+      </ol>
+    </li>
+    <li><a href="#s5" onclick="closeSidebar()">5. Arithmetic Circuits &amp; R1CS</a>
+      <ol>
+        <li><a href="#s5-1" onclick="closeSidebar()">5.1 Arithmetic Circuits</a></li>
+        <li><a href="#s5-2" onclick="closeSidebar()">5.2 From Circuits to R1CS</a></li>
+      </ol>
+    </li>
+    <li><a href="#s6" onclick="closeSidebar()">6. PLONKish Arithmetization</a>
+      <ol>
+        <li><a href="#s6-1" onclick="closeSidebar()">6.1 Execution Trace Table</a></li>
+        <li><a href="#s6-2" onclick="closeSidebar()">6.2 Custom Gates</a></li>
+        <li><a href="#s6-3" onclick="closeSidebar()">6.3 Lagrange Interpolation</a></li>
+        <li><a href="#s6-4" onclick="closeSidebar()">6.4 Table to Polynomials &amp; NTT</a></li>
+        <li><a href="#s6-5" onclick="closeSidebar()">6.5 Schwartz-Zippel Lemma</a></li>
+        <li><a href="#s6-6" onclick="closeSidebar()">6.6 Permutation Arguments</a></li>
+        <li><a href="#s6-7" onclick="closeSidebar()">6.7 Lookup Arguments</a></li>
+      </ol>
+    </li>
+    <li><a href="#s7" onclick="closeSidebar()">7. The Halo2 Proving System</a>
+      <ol>
+        <li><a href="#s7-1" onclick="closeSidebar()">7.1 Fiat-Shamir Transform</a></li>
+        <li><a href="#s7-2" onclick="closeSidebar()">7.2 Proof Generation</a></li>
+        <li><a href="#s7-3" onclick="closeSidebar()">7.3 Verification</a></li>
+        <li><a href="#s7-4" onclick="closeSidebar()">7.4 Circuit Parameters</a></li>
+      </ol>
+    </li>
+    <li><a href="#s8" onclick="closeSidebar()">8. Fixed-Point Arithmetic</a>
+      <ol>
+        <li><a href="#s8-1" onclick="closeSidebar()">8.1 Quantization Scheme</a></li>
+        <li><a href="#s8-2" onclick="closeSidebar()">8.2 Negative Numbers</a></li>
+        <li><a href="#s8-3" onclick="closeSidebar()">8.3 Arithmetic Operations</a></li>
+      </ol>
+    </li>
+    <li><a href="#s9" onclick="closeSidebar()">9. Polynomial Approximation</a>
+      <ol>
+        <li><a href="#s9-1" onclick="closeSidebar()">9.1 Remez Algorithm</a></li>
+        <li><a href="#s9-2" onclick="closeSidebar()">9.2 Horner's Method</a></li>
+        <li><a href="#s9-3" onclick="closeSidebar()">9.3 Range Reduction</a></li>
+      </ol>
+    </li>
+    <li><a href="#s10" onclick="closeSidebar()">10. ZK ML Circuits</a>
+      <ol>
+        <li><a href="#s10-1" onclick="closeSidebar()">10.1 Linear Regression</a></li>
+        <li><a href="#s10-2" onclick="closeSidebar()">10.2 Logistic Regression</a></li>
+        <li><a href="#s10-3" onclick="closeSidebar()">10.3 Decision Tree</a></li>
+      </ol>
+    </li>
+    <li><a href="#s11" onclick="closeSidebar()">11. Putting It All Together</a>
+      <ol>
+        <li><a href="#s11-1" onclick="closeSidebar()">11.1 Proof Guarantees</a></li>
+        <li><a href="#s11-2" onclick="closeSidebar()">11.2 Concrete Costs</a></li>
+      </ol>
+    </li>
+    <li><a href="#s12" onclick="closeSidebar()">12. References</a></li>
+  </ol>
+</nav>
+
+<!-- Mobile sidebar toggle button -->
+<button class="sidebar-toggle" id="sidebarToggle" onclick="openSidebar()" title="Table of Contents">&#9776;</button>
+
+<!-- Main content -->
+<main class="content">
+
+<h1>ZKFixedPointChip</h1>
+<p class="subtitle">Mathematical Foundations of Halo2 and Zero-Knowledge Machine Learning</p>
+
+<figure>
+<img src="../figure/zkp.png" alt="Zero-Knowledge Proof concept: Alice (Prover) generates proof from computation and private input; Bob (Verifier) checks the proof without learning private data." style="max-width:520px; width:100%;">
+<figcaption>A zero-knowledge proof lets Alice convince Bob that a computation was performed correctly, without revealing private inputs. The proof $\pi$ is <strong>succinct</strong> (small and fast to verify) and <strong>zero-knowledge</strong> (Bob learns nothing beyond the public output).</figcaption>
+</figure>
+
+<p>This project implements <strong>ZK Machine Learning (ZKML)</strong>: running ML algorithms (linear regression, logistic regression, decision trees) inside zero-knowledge circuits. The core challenge is that ZK circuits over the BN254 field natively support only $+$, $-$, $\times$ on unsigned integers&mdash;no fractions, no floats, no transcendental functions. This document builds the mathematical foundations needed to bridge that gap, from finite fields up through the Halo2 proving system to fixed-point ML circuits.</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s1">1. Finite Fields</h2>
+
+<p>All computation inside a zero-knowledge proof happens over a <strong>finite field</strong>, not ordinary real numbers. Think of it as doing arithmetic on a clock face, where the numbers wrap around.</p>
+
+<div class="definition">
+<span class="label">Definition 1.1 &mdash; Finite Field $\mathbb{F}_p$</span>
+Let $p$ be a prime number. The set $\mathbb{F}_p = \{0, 1, 2, \dots, p-1\}$ equipped with addition and multiplication <em>modulo $p$</em> forms a <strong>finite field</strong>. That is, for any $a, b \in \mathbb{F}_p$:
+$$a +_p b \;=\; (a + b) \bmod p, \qquad a \cdot_p b \;=\; (a \cdot b) \bmod p.$$
+</div>
+
+<p>The key properties that make $\mathbb{F}_p$ a field (analogous to the reals $\mathbb{R}$, but finite):</p>
+<ul>
+  <li><strong>Closure:</strong> addition and multiplication stay inside $\{0,\dots,p-1\}$.</li>
+  <li><strong>Inverses:</strong> every nonzero $a$ has a unique multiplicative inverse $a^{-1}$ such that $a \cdot a^{-1} \equiv 1 \pmod{p}$. (Computed via Fermat's little theorem: $a^{-1} = a^{p-2} \bmod p$.)</li>
+  <li><strong>No zero divisors:</strong> if $a \cdot b \equiv 0 \pmod p$, then $a = 0$ or $b = 0$.</li>
+</ul>
+
+<div class="example-box">
+<span class="label">Example</span>
+In $\mathbb{F}_7$: $\;5 + 4 = 9 \bmod 7 = 2$, $\;3 \times 5 = 15 \bmod 7 = 1$, so $3^{-1} = 5$.
+</div>
+
+<p>This project uses the <strong>BN254 scalar field</strong>, where:</p>
+$$p = 21888242871839275222246405745257275088548364400416034343698204186575808495617$$
+<p>This is a 254-bit prime. Every value we compute (weights, inputs, polynomial coefficients) lives in $\mathbb{F}_p$.</p>
+
+<h3 id="s1-1">1.1 Cyclic Groups</h3>
+
+<p>A <strong>group</strong> $(G, \circ)$ is a set $G$ with an operation $\circ$ that is associative, has an identity, and every element has an inverse.</p>
+
+<div class="definition">
+<span class="label">Definition 1.2 &mdash; Cyclic Group</span>
+A group $G$ is <strong>cyclic</strong> if there exists a <em>generator</em> $g \in G$ such that every element of $G$ can be written as $g^k$ for some integer $k$. We write $G = \langle g \rangle$. The <strong>order</strong> of $G$, written $|G|$, is the number of elements in $G$. For example, $|\mathbb{F}_7^*| = |\{1,2,3,4,5,6\}| = 6$.
+</div>
+
+<p>The multiplicative group $\mathbb{F}_p^* = \mathbb{F}_p \setminus \{0\}$ is cyclic of order $p-1$. This means there exists a generator $g$ such that $\{g^0, g^1, g^2, \dots, g^{p-2}\} = \mathbb{F}_p^*$.</p>
+
+<p>Crucially, if $n$ divides $p-1$ (written $n \mid (p-1)$), then there exists an element $\omega \in \mathbb{F}_p$ of order $n$, meaning $\omega^n = 1$ and $\omega^k \neq 1$ for $0 < k < n$. These are the <strong>$n$-th roots of unity</strong>, and they enable the NTT (Number Theoretic Transform) that makes polynomial arithmetic efficient inside Halo2.</p>
+
+<div class="example-box">
+<span class="label">Example &mdash; Roots of Unity</span>
+In $\mathbb{F}_7$, we have $p - 1 = 6$. Since $3 \mid 6$, there exists an element of order 3. Take $\omega = 2$: we get $2^1 = 2,\; 2^2 = 4,\; 2^3 = 8 \equiv 1 \pmod 7$. So $\{1, 2, 4\}$ are the 3rd roots of unity in $\mathbb{F}_7$. Halo2 uses this same idea with $n = 2^k$ (a power of two) to lay out the execution trace and perform fast polynomial evaluation.
+</div>
+
+<h3 id="s1-2">1.2 Extension Fields</h3>
+
+<p>Just as the real numbers $\mathbb{R}$ can be extended to the complex numbers $\mathbb{C} = \mathbb{R}[i]/(i^2+1)$ by adjoining $\sqrt{-1}$, finite fields can be extended similarly.</p>
+
+<div class="definition">
+<span class="label">Definition 1.3 &mdash; Extension Field $\mathbb{F}_{p^k}$</span>
+Let $m(x)$ be an <strong>irreducible polynomial</strong> of degree $k$ over $\mathbb{F}_p$ (meaning it cannot be factored into lower-degree polynomials). The <strong>extension field</strong> $\mathbb{F}_{p^k}$ consists of all polynomials of degree $< k$ with coefficients in $\mathbb{F}_p$, where arithmetic is performed modulo $m(x)$:
+$$\mathbb{F}_{p^k} \;=\; \mathbb{F}_p[x]\,/\,\bigl(m(x)\bigr) \;=\; \{a_0 + a_1 x + \cdots + a_{k-1}x^{k-1} : a_i \in \mathbb{F}_p\}.$$
+This field has $p^k$ elements. Addition is component-wise; multiplication is polynomial multiplication reduced modulo $m(x)$.
+</div>
+
+<div class="example-box">
+<span class="label">Example &mdash; $\mathbb{F}_{5^2}$</span>
+<p>Take $p = 5$ and the irreducible polynomial $m(x) = x^2 + 2$ over $\mathbb{F}_5$. (It's irreducible because neither $0, 1, 2, 3, 4$ is a root: $0^2 + 2 = 2$, $1^2+2=3$, $2^2+2=1$, $3^2+2=1$, $4^2+2=3$&mdash;none are zero mod 5.)</p>
+<p>Elements look like $a + bx$ with $a, b \in \mathbb{F}_5$. There are $5^2 = 25$ elements. To multiply $(2 + 3x)(1 + 4x)$:</p>
+$$2 + 8x + 3x + 12x^2 = 2 + 11x + 12x^2 \equiv 2 + x + 2x^2 \pmod{5}.$$
+<p>Now reduce $x^2 \equiv -2 \equiv 3 \pmod{m(x)}$, giving $2 + x + 2 \cdot 3 = 8 + x \equiv 3 + x \pmod{5}$.</p>
+</div>
+
+<p>Extension fields matter for <strong>elliptic curve pairings</strong> (Section 3). The pairing's target group $\mathbb{G}_T$ lives in $\mathbb{F}_{p^{12}}^*$&mdash;a degree-12 extension of $\mathbb{F}_p$. Each element of $\mathbb{F}_{p^{12}}$ is a polynomial of degree 11 with $\mathbb{F}_p$ coefficients, so it takes 12 field elements to represent. In practice, tower extensions like $\mathbb{F}_{p^2} \to \mathbb{F}_{p^6} \to \mathbb{F}_{p^{12}}$ are used for efficiency.</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s2">2. Elliptic Curves</h2>
+
+<p>Elliptic curves provide the "hard problems" that make cryptography secure. They also give us the algebraic structure needed for polynomial commitments.</p>
+
+<h3 id="s2-1">2.1 The Curve Equation</h3>
+
+<div class="definition">
+<span class="label">Definition 2.1 &mdash; Elliptic Curve</span>
+An <strong>elliptic curve</strong> over a field $\mathbb{F}$ is the set of points $(x, y) \in \mathbb{F}^2$ satisfying the <em>short Weierstrass equation</em>:
+$$E : \quad y^2 = x^3 + ax + b, \qquad 4a^3 + 27b^2 \neq 0,$$
+together with a special <em>point at infinity</em> $\mathcal{O}$.
+</div>
+
+<p>The condition $4a^3 + 27b^2 \neq 0$ ensures the curve has no singular points (cusps or self-intersections). For the <strong>BN254 curve</strong> used in this project, $a = 0$ and $b = 3$, giving:</p>
+$$E_{\text{BN254}} : \quad y^2 = x^3 + 3 \quad \text{over } \mathbb{F}_p.$$
+
+<div class="info-box">
+<strong>Why "discrete"?</strong> When we draw elliptic curves in textbooks (and in the figure below), we plot them over the real numbers $\mathbb{R}$, which gives a smooth, continuous curve. But in cryptography, we work over a <em>finite field</em> $\mathbb{F}_p$. There, $x$ and $y$ can only take values in $\{0, 1, \dots, p-1\}$, so the "curve" is really a <strong>discrete set of scattered points</strong>&mdash;no lines, no tangents in the geometric sense. The algebraic formulas for point addition (slopes, intercepts) still work identically, because they only use field operations ($+, -, \times, \div$), which $\mathbb{F}_p$ supports. The smooth curve picture is just a visual aid; the actual computation happens on isolated dots in a finite grid.
+</div>
+
+<div class="example-box">
+<span class="label">Example &mdash; A tiny curve over $\mathbb{F}_{23}$</span>
+Consider $y^2 = x^3 + x + 1$ over $\mathbb{F}_{23}$. We check every $x \in \{0, \dots, 22\}$, compute $x^3 + x + 1 \bmod 23$, and see if the result is a perfect square mod 23. For instance, $x = 0$: $0 + 0 + 1 = 1$, and $1 = 1^2$, so $(0, 1)$ and $(0, 22)$ are on the curve. Repeating for all $x$ yields 28 points plus $\mathcal{O}$, giving $|E(\mathbb{F}_{23})| = 29$. These 29 points are spread seemingly at random across the $23 \times 23$ grid&mdash;nothing like a smooth curve.
+</div>
+
+<p>But how do we determine whether a value has a square root in $\mathbb{F}_p$, and how do we compute it? This is where <strong>Euler's criterion</strong> and <strong>Fermat's little theorem</strong> come in.</p>
+
+<div class="definition">
+<span class="label">Definition 2.1b &mdash; Quadratic Residue</span>
+An element $a \in \mathbb{F}_p^*$ is a <strong>quadratic residue</strong> (QR) if there exists some $r \in \mathbb{F}_p$ such that $r^2 \equiv a \pmod{p}$. Otherwise it is a <strong>non-residue</strong> (NR). Exactly half of the nonzero elements of $\mathbb{F}_p$ are QRs.
+</div>
+
+<p><strong>Euler's criterion</strong> gives a simple test: $a$ is a QR if and only if</p>
+$$a^{(p-1)/2} \equiv 1 \pmod{p}.$$
+<p>If the result is $p - 1$ (i.e., $-1$), then $a$ has no square root in $\mathbb{F}_p$, and the point $(x, \cdot)$ is not on the curve.</p>
+
+<p>When $a$ <em>is</em> a QR and $p \equiv 3 \pmod{4}$ (which is the common case for many cryptographic primes), the square root can be computed directly:</p>
+$$r = a^{(p+1)/4} \bmod p.$$
+
+<div class="theorem">
+<span class="label">Why this works</span>
+Verify: $r^2 = a^{(p+1)/2} = a^{(p-1)/2} \cdot a = 1 \cdot a = a \pmod{p}$, where the last step uses Euler's criterion ($a^{(p-1)/2} = 1$ for a QR). Since $y^2 = a$ is symmetric, the two roots are $r$ and $p - r$ (i.e., $-r$).
+</div>
+
+<div class="example-box">
+<span class="label">Example &mdash; Square root in $\mathbb{F}_{23}$</span>
+<p>Is $x = 0$ on the curve $y^2 = x^3 + x + 1$ over $\mathbb{F}_{23}$? Compute $a = 0^3 + 0 + 1 = 1$.</p>
+<ul>
+  <li><strong>Test (Euler):</strong> $1^{(23-1)/2} = 1^{11} = 1 \equiv 1 \pmod{23}$. Yes, 1 is a QR.</li>
+  <li><strong>Square root:</strong> Since $23 \equiv 3 \pmod 4$, compute $r = 1^{(23+1)/4} = 1^6 = 1$.</li>
+  <li><strong>Points:</strong> $(0,\; 1)$ and $(0,\; 23 - 1) = (0,\; 22)$.</li>
+</ul>
+<p>Now try $x = 1$: $a = 1 + 1 + 1 = 3$. Test: $3^{11} \bmod 23 = 177147 \bmod 23 = 1$. So 3 is a QR. Root: $r = 3^{6} = 729 \bmod 23 = 16$. Points: $(1, 16)$ and $(1, 7)$.</p>
+<p>Now try $x = 3$: $a = 27 + 3 + 1 = 31 \equiv 8 \pmod{23}$. Test: $8^{11} \bmod 23 = 22 \equiv -1$. So 8 is a NR&mdash;no points at $x = 3$.</p>
+</div>
+
+<p>For primes where $p \equiv 1 \pmod 4$ (including the BN254 prime), the <strong>Tonelli-Shanks algorithm</strong> is used instead. The details are more involved, but the key takeaway is: finding square roots in $\mathbb{F}_p$ is <em>efficient</em> (polynomial time), so enumerating curve points is computationally feasible.</p>
+
+<h3 id="s2-2">2.2 The Group Law (Point Addition)</h3>
+
+<p>The remarkable fact is that the points on an elliptic curve form an <strong>abelian group</strong> under a geometric addition rule. The identity element is $\mathcal{O}$.</p>
+
+<figure class="diagram-svg">
+<svg viewBox="0 0 560 460" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <clipPath id="ecPlot">
+      <rect x="20" y="5" width="530" height="450"/>
+    </clipPath>
+    <marker id="arrowThin" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#78716c"/>
+    </marker>
+  </defs>
+
+  <!-- x-axis -->
+  <line x1="40" y1="230" x2="530" y2="230" stroke="#d6d3d1" stroke-width="0.7"/>
+  <text x="534" y="234" font-size="11" fill="#a8a29e" font-style="italic">x</text>
+  <text x="273" y="16" font-size="11" fill="#a8a29e" font-style="italic">y</text>
+  <line x1="278" y1="20" x2="278" y2="445" stroke="#d6d3d1" stroke-width="0.7"/>
+
+  <!-- Elliptic curve (classic shape, like y²=x³-x+1 over ℝ) -->
+  <!-- Upper branch: starts from left, dips, comes back up and rises to the right -->
+  <path d="M 60,230
+           C 60,202 80,165 105,148
+           C 130,131 150,138 165,158
+           C 175,170 180,188 185,196
+           C 195,210 205,214 218,206
+           C 235,195 255,170 280,140
+           C 305,110 335,82 368,62
+           C 400,42 435,32 470,36
+           C 500,39 520,50 535,58"
+        fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" clip-path="url(#ecPlot)"/>
+
+  <!-- Lower branch (mirror) -->
+  <path d="M 60,230
+           C 60,258 80,295 105,312
+           C 130,329 150,322 165,302
+           C 175,290 180,272 185,264
+           C 195,250 205,246 218,254
+           C 235,265 255,290 280,320
+           C 305,350 335,378 368,398
+           C 400,418 435,428 470,424
+           C 500,421 520,410 535,402"
+        fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" clip-path="url(#ecPlot)"/>
+
+  <!-- ═══ Point Addition Construction ═══ -->
+
+  <!-- Choose 3 collinear points on the curve:
+       P on upper branch: (165, 158)
+       Q on upper branch: (340, 78)
+       R' on lower branch: (108, 310)
+
+       Check collinearity:
+       Slope P→Q: (78-158)/(340-165) = -80/175 = -0.457
+       At x=108: y = 158 + (108-165)*(-0.457) = 158 + 26.05 = 184  → want 310, not collinear.
+
+       Try: P=(218, 206), Q=(368, 62), R'=(108, 310)
+       Slope P→Q: (62-206)/(368-218) = -144/150 = -0.96
+       At x=108: y = 206 + (108-218)*(-0.96) = 206 + 105.6 = 311.6 ≈ 310 ✓ Close enough!
+  -->
+
+  <!-- Secant line through P, Q, R' -->
+  <!-- Extend: at x=60, y = 206+(60-218)*(-0.96) = 206+151.7 = 357.7 -->
+  <!-- at x=440, y = 206+(440-218)*(-0.96) = 206-213.1 = -7.1 → clip at top -->
+  <!-- at x=420, y = 206+(420-218)*(-0.96) = 206-193.9 = 12.1 -->
+  <line x1="55" y1="362" x2="425" y2="8" stroke="#78716c" stroke-width="1.3" stroke-dasharray="6,4" clip-path="url(#ecPlot)"/>
+
+  <!-- R' on lower branch (third intersection) -->
+  <circle cx="108" cy="310" r="5.5" fill="#d97706"/>
+  <text x="68" y="308" font-size="15" font-weight="700" fill="#d97706" font-style="italic">R'</text>
+
+  <!-- P on upper branch -->
+  <circle cx="218" cy="206" r="5.5" fill="#2563eb"/>
+  <text x="198" y="198" font-size="15" font-weight="700" fill="#2563eb" font-style="italic">P</text>
+
+  <!-- Q on upper branch -->
+  <circle cx="368" cy="62" r="5.5" fill="#2563eb"/>
+  <text x="376" y="58" font-size="15" font-weight="700" fill="#2563eb" font-style="italic">Q</text>
+
+  <!-- Dashed vertical line from R' down to R (reflection over x-axis) -->
+  <!-- R' = (108, 310), reflected R = (108, 230-(310-230)) = (108, 150) -->
+  <!-- R is on upper branch at roughly (108, 150) ≈ (105, 148) from our curve — close enough -->
+  <line x1="108" y1="310" x2="108" y2="148" stroke="#059669" stroke-width="1.8" stroke-dasharray="5,3"/>
+
+  <!-- Arrow indicating reflection direction -->
+  <polygon points="108,152 103,165 113,165" fill="#059669"/>
+
+  <!-- R = P + Q (reflected point) -->
+  <circle cx="108" cy="148" r="6" fill="#059669" stroke="white" stroke-width="1.5"/>
+  <text x="56" y="142" font-size="15" font-weight="700" fill="#059669">P + Q</text>
+
+  <!-- Annotation: "reflect" label -->
+  <text x="116" y="238" font-size="11" fill="#059669" font-style="italic">reflect</text>
+
+  <!-- Legend -->
+  <rect x="310" y="400" width="220" height="50" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-width="0.8"/>
+  <line x1="322" y1="418" x2="350" y2="418" stroke="#78716c" stroke-width="1.3" stroke-dasharray="5,3"/>
+  <text x="356" y="422" font-size="10.5" fill="#78716c">Secant line</text>
+  <line x1="322" y1="438" x2="350" y2="438" stroke="#059669" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <text x="356" y="442" font-size="10.5" fill="#78716c">Reflect over x-axis</text>
+</svg>
+<figcaption>Geometric construction of point addition on an elliptic curve. The line through $P$ and $Q$ intersects the curve at a third point $R'$. Reflecting $R'$ over the $x$-axis gives $P + Q$.</figcaption>
+</figure>
+
+<h4>Case 1: Adding two distinct points $P + Q$</h4>
+
+<p>Given $P = (x_1, y_1)$ and $Q = (x_2, y_2)$ with $x_1 \neq x_2$:</p>
+
+<ol>
+  <li>Draw the line through $P$ and $Q$. It intersects $E$ at exactly one more point $R'$.</li>
+  <li>Reflect $R'$ over the $x$-axis to get $R = P + Q$.</li>
+</ol>
+
+<p>The formulas are:</p>
+$$\lambda = \frac{y_2 - y_1}{x_2 - x_1}, \qquad x_3 = \lambda^2 - x_1 - x_2, \qquad y_3 = \lambda(x_1 - x_3) - y_1.$$
+
+<h4>Case 2: Point doubling $P + P = 2P$</h4>
+
+<p>When $P = Q$, the "line through $P$ and $Q$" becomes the <em>tangent line</em> at $P$. Using implicit differentiation on $y^2 = x^3 + ax + b$:</p>
+$$\lambda = \frac{3x_1^2 + a}{2y_1}, \qquad x_3 = \lambda^2 - 2x_1, \qquad y_3 = \lambda(x_1 - x_3) - y_1.$$
+
+<h4>Case 3: Inverse</h4>
+<p>The inverse of $P = (x, y)$ is $-P = (x, -y)$. If $P + Q = \mathcal{O}$, then $Q = -P$.</p>
+
+<div class="info-box">
+<strong>Why calculus matters here:</strong> The tangent-line formula for point doubling uses the derivative $dy/dx = (3x^2 + a)/(2y)$, obtained by implicitly differentiating the curve equation&mdash;the same technique from Calculus I.
+</div>
+
+<h3 id="s2-3">2.3 Scalar Multiplication and the Discrete Logarithm</h3>
+
+<p><strong>Scalar multiplication</strong> is defined as repeated addition: for an integer $k$,</p>
+$$[k]P = \underbrace{P + P + \cdots + P}_{k \text{ times}}.$$
+
+<p>This can be computed efficiently in $O(\log k)$ steps via <em>double-and-add</em>. However, the <em>reverse</em> problem (given $P$ and $Q = [k]P$, find $k$) is called the <strong>Elliptic Curve Discrete Logarithm Problem (ECDLP)</strong>, and it is believed to be computationally intractable. This hardness is the foundation of elliptic-curve cryptography.</p>
+
+<div class="definition">
+<span class="label">Definition 2.2 &mdash; Curve Group Order</span>
+The set of points $E(\mathbb{F}_p) = \{(x,y) \in \mathbb{F}_p^2 : y^2 = x^3 + ax + b\} \cup \{\mathcal{O}\}$ forms a finite abelian group. Its order $n = |E(\mathbb{F}_p)|$ satisfies Hasse's bound: $|n - (p+1)| \leq 2\sqrt{p}$.
+</div>
+
+<p>For BN254, the group has a large prime-order subgroup of order $r$, which is the scalar field we do arithmetic in.</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s3">3. Elliptic Curve Pairings</h2>
+
+<p>Pairings are a powerful tool that enables the verification step in KZG polynomial commitments. A pairing "multiplies" points from two different curve groups and maps them into a third group.</p>
+
+<h3 id="s3-1">3.1 Bilinear Maps</h3>
+
+<div class="definition">
+<span class="label">Definition 3.1 &mdash; Bilinear Pairing</span>
+A <strong>bilinear pairing</strong> is a map
+$$e : \mathbb{G}_1 \times \mathbb{G}_2 \to \mathbb{G}_T$$
+where $\mathbb{G}_1, \mathbb{G}_2$ are (additive) elliptic curve groups of prime order $r$, and $\mathbb{G}_T$ is a (multiplicative) subgroup of $\mathbb{F}_{p^k}^*$ of the same order $r$, satisfying:
+<ol>
+  <li><strong>Bilinearity:</strong> $e([a]P, [b]Q) = e(P, Q)^{ab}$ for all $a, b \in \mathbb{Z}$ and $P \in \mathbb{G}_1, Q \in \mathbb{G}_2$.</li>
+  <li><strong>Non-degeneracy:</strong> if $P \neq \mathcal{O}$ and $Q \neq \mathcal{O}$, then $e(P, Q) \neq 1$.</li>
+  <li><strong>Computability:</strong> $e$ can be computed efficiently (via the Tate or optimal Ate pairing).</li>
+</ol>
+</div>
+
+<p>The integer $k$ is called the <strong>embedding degree</strong>. For BN254, $k = 12$, meaning $\mathbb{G}_T \subset \mathbb{F}_{p^{12}}^*$.</p>
+
+<h3 id="s3-2">3.2 Why Pairings Matter</h3>
+
+<p>The bilinearity property is the key. It lets a verifier check polynomial equations "in the exponent"&mdash;that is, verify relationships between secret values that are hidden inside elliptic curve points, without ever seeing those values directly.</p>
+
+<div class="example-box">
+<span class="label">Key Identity</span>
+$$e([a]G_1, [b]G_2) = e(G_1, G_2)^{ab} = e([b]G_1, [a]G_2) = e([ab]G_1, G_2).$$
+This "moves scalars around" freely between the arguments.
+</div>
+
+<h4>What does "in the exponent" mean?</h4>
+
+<p>Recall that $[a]G_1$ means $\underbrace{G_1 + G_1 + \cdots + G_1}_{a \text{ times}}$. The scalar $a$ is "locked inside" the curve point&mdash;given $[a]G_1$, you cannot extract $a$ (that's the discrete log problem). We say $a$ is "in the exponent" because the notation mirrors $g^a$ in multiplicative groups.</p>
+
+<p>Now suppose someone gives you two curve points $A = [a]G_1$ and $B = [b]G_2$, and you want to check whether $a \cdot b = c$ for some known $c$&mdash;without knowing $a$ or $b$. Ordinary arithmetic can't help: you can't multiply curve points. But pairings can:</p>
+
+$$e(A, B) = e([a]G_1,\; [b]G_2) = e(G_1, G_2)^{ab}.$$
+
+<p>Meanwhile, you can independently compute $e(G_1, G_2)^c$. If $e(A, B) = e(G_1, G_2)^c$, then $ab = c$. You just verified a multiplication <em>of hidden values</em> using only their curve-point "encryptions."</p>
+
+<div class="example-box">
+<span class="label">Concrete Example &mdash; Verifying a Hidden Product</span>
+<p>Suppose a prover claims they know $a, b$ such that $a \cdot b = 6$, and they give you $A = [a]G_1$, $B = [b]G_2$. You check:</p>
+$$e(A, B) \stackrel{?}{=} e([6]G_1,\; G_2).$$
+<p>By bilinearity, the left side equals $e(G_1,G_2)^{ab}$ and the right side equals $e(G_1,G_2)^6$. These are equal if and only if $ab = 6$. You verified the relationship without learning $a$ or $b$.</p>
+</div>
+
+<p>This is exactly how KZG verification works (Section 4): the verifier checks that $q(\tau) \cdot (\tau - z) = f(\tau) - v$ (a polynomial equation in the secret $\tau$) by comparing pairings of curve points that "contain" these values in their exponents.</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s4">4. Polynomial Commitments (KZG)</h2>
+
+<p>A <strong>polynomial commitment scheme</strong> allows a prover to commit to a polynomial and later prove evaluations of it. This project uses the <strong>KZG</strong> (Kate-Zaverucha-Goldberg) scheme, which relies on pairings.</p>
+
+<h3 id="s4-1">4.1 Trusted Setup (Structured Reference String)</h3>
+
+<p>A one-time setup generates the <strong>SRS</strong>. A secret $\tau$ (toxic waste, must be destroyed) is chosen, and the following are published:</p>
+$$\text{SRS} = \bigl(G_1,\; [\tau]G_1,\; [\tau^2]G_1,\; \dots,\; [\tau^d]G_1,\;\; G_2,\; [\tau]G_2\bigr)$$
+<p>where $G_1, G_2$ are generators of $\mathbb{G}_1, \mathbb{G}_2$ and $d$ is the maximum polynomial degree. Nobody knows $\tau$, only its "encrypted" forms on the curve.</p>
+
+<h3 id="s4-2">4.2 Commit</h3>
+
+<p>To commit to a polynomial $f(x) = \sum_{i=0}^{d} c_i x^i$, the prover computes:</p>
+$$C = [f(\tau)]G_1 = \sum_{i=0}^{d} c_i \cdot [\tau^i]G_1.$$
+<p>The prover can compute this using only the SRS (without knowing $\tau$). The commitment $C$ is a single elliptic curve point&mdash;it is <em>binding</em> (the prover cannot change $f$ after committing) and <em>hiding</em>.</p>
+
+<h3 id="s4-3">4.3 Open and Verify</h3>
+
+<p>Suppose the prover wants to convince the verifier that $f(z) = v$ for a specific point $z$ and value $v$. The protocol has three steps.</p>
+
+<h4>Step 1: The key algebraic idea</h4>
+
+<p>By the <strong>factor theorem</strong>, $f(z) = v$ if and only if $(x - z)$ divides $f(x) - v$ with no remainder. That is:</p>
+
+$$f(z) = v \quad \iff \quad f(x) - v = (x - z) \cdot q(x) \quad \text{for some polynomial } q(x).$$
+
+<p>We call $q(x)$ the <strong>quotient polynomial</strong>. It has degree $\deg(f) - 1$.</p>
+
+<div class="theorem">
+<span class="label">Why? (Factor Theorem)</span>
+Dividing $f(x)$ by $(x - z)$ gives $f(x) = (x - z) \cdot q(x) + r$ where $r$ is a constant. Substituting $x = z$:
+$$f(z) = \underbrace{(z - z)}_{= \, 0} \cdot \, q(z) + r = r.$$
+So the remainder $r$ equals $f(z)$. If $f(z) = v$, then $r = v$, and $f(x) - v = (x-z) \cdot q(x)$ exactly. If $f(z) \neq v$, the remainder $r - v \neq 0$, and no such $q(x)$ exists.
+</div>
+
+<h4>Step 2: The prover's work</h4>
+
+<p>The prover computes $q(x)$ (which they can do since they know $f$), and sends its commitment:</p>
+$$\pi = [q(\tau)]G_1 = \sum_i q_i \cdot [\tau^i]G_1.$$
+<p>Note: the prover uses the SRS to evaluate $q$ at the secret $\tau$ "in the exponent," just like the original commitment $C$.</p>
+
+<h4>Step 3: The verifier's pairing check</h4>
+
+<p>The verifier needs to check whether $q(\tau) \cdot (\tau - z) = f(\tau) - v$ holds. All three quantities ($q(\tau)$, $\tau$, $f(\tau)$) are hidden in curve points, so the verifier uses a pairing. The check is:</p>
+
+$$e\bigl(\;\pi,\;\; [\tau]G_2 - [z]G_2\;\bigr) \;\stackrel{?}{=}\; e\bigl(\;C - [v]G_1,\;\; G_2\;\bigr)$$
+
+<p>Let's unpack each side:</p>
+<ul>
+  <li><strong>Left side:</strong> $\pi = [q(\tau)]G_1$ and $[\tau]G_2 - [z]G_2 = [\tau - z]G_2$, so by bilinearity:
+  $$e([q(\tau)]G_1,\; [\tau - z]G_2) = e(G_1, G_2)^{q(\tau)(\tau - z)}.$$</li>
+  <li><strong>Right side:</strong> $C - [v]G_1 = [f(\tau)]G_1 - [v]G_1 = [f(\tau) - v]G_1$, so:
+  $$e([f(\tau) - v]G_1,\; G_2) = e(G_1, G_2)^{f(\tau) - v}.$$</li>
+</ul>
+
+<p>The two sides are equal if and only if $q(\tau)(\tau - z) = f(\tau) - v$, which is exactly the polynomial identity from Step 1. The verifier has confirmed $f(z) = v$ without learning $f$, $\tau$, or $q$.</p>
+
+<div class="theorem">
+<span class="label">Theorem 4.1 &mdash; KZG Verification Correctness</span>
+The pairing check succeeds if and only if $f(z) = v$. The equivalence chain:
+$$\begin{aligned}
+&\underbrace{e(G_1, G_2)^{q(\tau)(\tau - z)}}_{\text{left side}} \;=\; \underbrace{e(G_1, G_2)^{f(\tau) - v}}_{\text{right side}} \\[8pt]
+\iff\quad & q(\tau)\,(\tau - z) \;=\; f(\tau) - v  &\text{(compare exponents)}\\[4pt]
+\iff\quad & f(z) = v  &\text{(factor theorem)}
+\end{aligned}$$
+</div>
+
+<h4>How is the pairing $e(P, Q)$ actually computed?</h4>
+
+<p>Section 3 told us <em>what</em> pairings do (verify hidden-value equations via bilinearity), but not <em>how</em>. The construction may seem mysterious, so let's build intuition step by step.</p>
+
+<p><strong>The goal.</strong> We need a function $e(P, Q)$ that "multiplies exponents": $e([a]G_1, [b]G_2) = e(G_1, G_2)^{ab}$. How can we build such a thing from elliptic curve operations?</p>
+
+<p><strong>Key insight: eavesdrop on scalar multiplication.</strong> Recall from Section 2.3 that computing $[k]Q$ uses a double-and-add loop, which at each step draws a <em>line</em> on the curve (tangent for doubling, secant for addition&mdash;Section 2.2). Normally, we use these lines to find intersection points. But what if, instead, we <strong>evaluate each line at a separate point $P$</strong> and multiply the results together? The resulting product would "encode" information about $k$ (the scalar) and $P$ simultaneously&mdash;exactly the bilinear structure we need.</p>
+
+<p><strong>That is Miller's algorithm.</strong> It runs the double-and-add loop on $Q \in \mathbb{G}_2$, but at every step, it also evaluates the line at $P \in \mathbb{G}_1$ and accumulates the result:</p>
+
+<pre>
+f = 1,  R = Q                      <em>// accumulator and running point</em>
+for i = (num_bits - 2) down to 0:  <em>// loop over bits of curve parameter</em>
+    f = f² · ℓ<sub>R,R</sub>(P)                 <em>// square f, multiply by tangent-at-R evaluated at P</em>
+    R = 2R                          <em>// double R (same as point-addition doubling)</em>
+    if bit<sub>i</sub> == 1:
+        f = f · ℓ<sub>R,Q</sub>(P)              <em>// multiply by secant-through-R-and-Q evaluated at P</em>
+        R = R + Q                   <em>// add Q</em>
+e(P, Q) = f<sup>(p¹²−1)/r</sup>                <em>// final exponentiation</em>
+</pre>
+
+<p>The line function $\ell_{A,B}(P)$ is the same tangent/secant line from the point addition in Section 2.2, but instead of finding where it hits the curve, we just <strong>plug in $P$'s coordinates</strong> and get a number:</p>
+
+$$\ell_{A,B}(P) = y_P - y_A - \lambda(x_P - x_A), \quad \lambda = \begin{cases} \dfrac{3x_A^2 + a}{2y_A} & A = B \text{ (tangent)}, \\[6pt] \dfrac{y_B - y_A}{x_B - x_A} & A \neq B \text{ (secant)}. \end{cases}$$
+
+<p>Since $P \in \mathbb{G}_1$ (over $\mathbb{F}_p$) and $A, B \in \mathbb{G}_2$ (over $\mathbb{F}_{p^2}$), the coordinates live in different fields, so the output is an element of $\mathbb{F}_{p^{12}}$ (the extension field from Section 1.2).</p>
+
+<p><strong>Final exponentiation.</strong> The loop produces $f \in \mathbb{F}_{p^{12}}$, but we need the result in the target group $\mathbb{G}_T$&mdash;the unique order-$r$ subgroup of $\mathbb{F}_{p^{12}}^*$ (where $r$ is the prime group order from Definition 2.2). Raising to the power $(p^{12} - 1)/r$ projects $f$ into this subgroup, the same way $a^{p-1} = 1$ in Fermat's little theorem (Section 1).</p>
+
+<p><strong>Why is the result bilinear?</strong> If we replace $P$ with $[a]P$, every line evaluation $\ell(\cdot)$ picks up a factor related to $a$. If we run the loop with $[b]Q$ instead of $Q$, the loop takes $b$ times as many effective steps. The multiplicative structure of the accumulator ensures these factors combine as $e(G_1, G_2)^{ab}$&mdash;exactly bilinearity. (The formal proof uses the theory of <em>divisors</em> on algebraic curves, but the intuition is: the accumulator records the "arithmetic trace" of a scalar multiplication, and scaling either input scales the trace proportionally.)</p>
+
+<p>For BN254, the loop runs ~63 iterations (bits of $6u + 2$), and the entire KZG verification (two pairings) takes ~2ms.</p>
+
+<figure class="diagram-svg">
+<svg viewBox="0 0 700 420" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arrowMiller" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#78716c"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="350" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Miller's Algorithm: computing $e(P, Q)$</text>
+
+  <!-- G2 curve (left side) -->
+  <rect x="20" y="40" width="280" height="310" rx="10" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="160" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="var(--dim)">Curve $\mathbb{G}_2$ (double-and-add on Q)</text>
+
+  <!-- Points on G2 curve -->
+  <circle cx="80" cy="260" r="6" fill="#2563eb"/>
+  <text x="68" y="280" font-size="13" font-weight="700" fill="#2563eb" font-style="italic">Q</text>
+
+  <!-- R after first double: 2Q -->
+  <circle cx="160" cy="140" r="6" fill="#2563eb"/>
+  <text x="148" y="130" font-size="12" font-weight="600" fill="#2563eb">2Q</text>
+
+  <!-- R after add: 3Q -->
+  <circle cx="230" cy="200" r="6" fill="#2563eb"/>
+  <text x="240" y="196" font-size="12" font-weight="600" fill="#2563eb">3Q</text>
+
+  <!-- Tangent line at Q (for doubling) -->
+  <line x1="40" y1="300" x2="200" y2="100" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+  <text x="50" y="168" font-size="10" fill="#7c3aed" font-style="italic" transform="rotate(-48, 50, 168)">tangent at Q</text>
+
+  <!-- Secant line Q to 2Q (for addition) -->
+  <line x1="60" y1="290" x2="260" y2="110" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+  <text x="195" y="155" font-size="10" fill="#d97706" font-style="italic">secant Q, 2Q</text>
+
+  <!-- Arrow from Q to 2Q -->
+  <path d="M 86 254 Q 110 180 154 146" fill="none" stroke="#78716c" stroke-width="1.2" marker-end="url(#arrowMiller)"/>
+  <text x="95" y="195" font-size="10" fill="#78716c">R ← 2R</text>
+
+  <!-- Arrow from 2Q to 3Q -->
+  <path d="M 166 146 Q 200 160 224 194" fill="none" stroke="#78716c" stroke-width="1.2" marker-end="url(#arrowMiller)"/>
+  <text x="195" y="174" font-size="10" fill="#78716c">R ← R+Q</text>
+
+  <!-- P point (separate, on the right) -->
+  <rect x="340" y="40" width="160" height="310" rx="10" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="420" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="var(--dim)">Point $P \in \mathbb{G}_1$</text>
+
+  <circle cx="420" cy="200" r="7" fill="#059669" stroke="white" stroke-width="1.5"/>
+  <text x="432" y="196" font-size="14" font-weight="700" fill="#059669" font-style="italic">P</text>
+
+  <!-- Evaluate lines at P -->
+  <!-- tangent at Q, evaluated at P -->
+  <line x1="200" y1="100" x2="413" y2="200" stroke="#7c3aed" stroke-width="1.3" stroke-dasharray="3,3" opacity="0.5"/>
+  <text x="290" y="138" font-size="10.5" fill="#7c3aed" font-weight="600">ℓ<tspan font-size="8" dy="3">Q,Q</tspan><tspan dy="-3">(P) → v₁</tspan></text>
+
+  <!-- secant Q to 2Q, evaluated at P -->
+  <line x1="260" y1="110" x2="413" y2="200" stroke="#d97706" stroke-width="1.3" stroke-dasharray="3,3" opacity="0.5"/>
+  <text x="300" y="180" font-size="10.5" fill="#d97706" font-weight="600">ℓ<tspan font-size="8" dy="3">2Q,Q</tspan><tspan dy="-3">(P) → v₂</tspan></text>
+
+  <!-- Accumulator box (right side) -->
+  <rect x="530" y="40" width="150" height="310" rx="10" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="605" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="var(--dim)">Accumulator f</text>
+  <text x="605" y="85" text-anchor="middle" font-size="11" fill="var(--dim)">∈ $\mathbb{F}_{p^{12}}$</text>
+
+  <!-- Step 1 -->
+  <text x="545" y="120" font-size="11" fill="#7c3aed" font-weight="600">Step 1 (double):</text>
+  <text x="545" y="140" font-size="11" fill="currentColor">f ← 1² · v₁</text>
+  <text x="545" y="156" font-size="10" fill="var(--dim)">= ℓ<tspan font-size="8" dy="2">Q,Q</tspan><tspan dy="-2">(P)</tspan></text>
+
+  <!-- Step 2 -->
+  <text x="545" y="190" font-size="11" fill="#d97706" font-weight="600">Step 2 (add):</text>
+  <text x="545" y="210" font-size="11" fill="currentColor">f ← f · v₂</text>
+  <text x="545" y="226" font-size="10" fill="var(--dim)">= v₁ · v₂</text>
+
+  <!-- ... -->
+  <text x="605" y="258" text-anchor="middle" font-size="14" fill="var(--dim)">⋮</text>
+
+  <!-- Final -->
+  <text x="545" y="290" font-size="11" fill="#059669" font-weight="700">Final:</text>
+  <text x="545" y="312" font-size="11.5" fill="#059669" font-weight="600">e(P,Q) = f<tspan font-size="8" dy="-4">(p¹²−1)/r</tspan></text>
+
+  <!-- Arrows from P area to accumulator -->
+  <line x1="500" y1="140" x2="528" y2="140" stroke="#7c3aed" stroke-width="1.3" marker-end="url(#arrowMiller)"/>
+  <line x1="500" y1="210" x2="528" y2="210" stroke="#d97706" stroke-width="1.3" marker-end="url(#arrowMiller)"/>
+
+  <!-- Legend -->
+  <rect x="20" y="370" width="480" height="40" rx="6" fill="none" stroke="var(--border)" stroke-width="0.8"/>
+  <line x1="35" y1="390" x2="60" y2="390" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="65" y="394" font-size="10" fill="#78716c">Tangent line (double)</text>
+  <line x1="190" y1="390" x2="215" y2="390" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="220" y="394" font-size="10" fill="#78716c">Secant line (add)</text>
+  <line x1="340" y1="390" x2="365" y2="390" stroke="#78716c" stroke-width="1.3" stroke-dasharray="3,3" opacity="0.5"/>
+  <text x="370" y="394" font-size="10" fill="#78716c">Evaluate at P → field element</text>
+</svg>
+<figcaption>Miller's algorithm for computing $e(P, Q)$. Left: the double-and-add loop on $\mathbb{G}_2$ produces tangent/secant lines at each step. Middle: each line is <strong>evaluated at $P$</strong> (from $\mathbb{G}_1$), producing a nonzero $\mathbb{F}_{p^{12}}$ element. Right: these values are multiplied into an accumulator $f$, then a final exponentiation gives $e(P,Q) \in \mathbb{G}_T$.</figcaption>
+</figure>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s5">5. Arithmetic Circuits &amp; R1CS</h2>
+
+<p>Before we can prove a computation, we must express it as a system of algebraic constraints.</p>
+
+<h3 id="s5-1">5.1 Arithmetic Circuits</h3>
+
+<p>An <strong>arithmetic circuit</strong> over $\mathbb{F}_p$ is a directed acyclic graph where:</p>
+<ul>
+  <li><strong>Input nodes</strong> hold field elements (public inputs or private witnesses).</li>
+  <li><strong>Internal nodes</strong> are either addition ($+$) or multiplication ($\times$) gates.</li>
+  <li><strong>Output nodes</strong> produce the result.</li>
+</ul>
+
+<p>Any polynomial-time computation can be "flattened" into an arithmetic circuit. For example, computing $y = x^3 + x + 5$:</p>
+<div class="diagram-svg">
+<svg viewBox="0 0 620 200" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arrowB" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#78716c"/>
+    </marker>
+  </defs>
+
+  <!-- Input: x -->
+  <rect x="10" y="56" width="50" height="32" rx="6" fill="#7c3aed" opacity="0.12" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="35" y="77" text-anchor="middle" font-size="15" font-weight="600" font-style="italic" fill="#7c3aed">x</text>
+
+  <!-- Wire x → mul1 (top) -->
+  <line x1="60" y1="72" x2="120" y2="50" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+  <!-- Wire x → mul1 (bottom, same input) -->
+  <line x1="60" y1="72" x2="120" y2="70" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+
+  <!-- Gate: x * x -->
+  <rect x="125" y="38" width="44" height="44" rx="22" fill="#2563eb" opacity="0.10" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="147" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="#2563eb">&times;</text>
+
+  <!-- Wire label: x² -->
+  <text x="198" y="56" text-anchor="middle" font-size="12" fill="#a8a29e" font-style="italic">x&sup2;</text>
+
+  <!-- Wire x² → mul2 -->
+  <line x1="169" y1="60" x2="240" y2="50" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+  <!-- Wire x → mul2 (loop down and across) -->
+  <path d="M 35 88 L 35 140 L 210 140 L 210 70 L 240 70" fill="none" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+
+  <!-- Gate: x² * x -->
+  <rect x="245" y="38" width="44" height="44" rx="22" fill="#2563eb" opacity="0.10" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="267" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="#2563eb">&times;</text>
+
+  <!-- Wire label: x³ -->
+  <text x="318" y="56" text-anchor="middle" font-size="12" fill="#a8a29e" font-style="italic">x&sup3;</text>
+
+  <!-- Wire x³ → add1 -->
+  <line x1="289" y1="60" x2="360" y2="50" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+  <!-- Wire x → add1 (loop further) -->
+  <path d="M 35 88 L 35 170 L 330 170 L 330 70 L 360 70" fill="none" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+
+  <!-- Gate: x³ + x -->
+  <rect x="365" y="38" width="44" height="44" rx="22" fill="#059669" opacity="0.10" stroke="#059669" stroke-width="1.5"/>
+  <text x="387" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="#059669">+</text>
+
+  <!-- Wire label: x³+x -->
+  <text x="440" y="56" text-anchor="middle" font-size="12" fill="#a8a29e" font-style="italic">x&sup3;+x</text>
+
+  <!-- Wire x³+x → add2 -->
+  <line x1="409" y1="60" x2="470" y2="50" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+
+  <!-- Constant: 5 -->
+  <rect x="440" y="100" width="36" height="28" rx="6" fill="#d97706" opacity="0.12" stroke="#d97706" stroke-width="1.5"/>
+  <text x="458" y="120" text-anchor="middle" font-size="14" font-weight="600" fill="#d97706">5</text>
+  <!-- Wire 5 → add2 -->
+  <line x1="458" y1="100" x2="488" y2="82" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+
+  <!-- Gate: (x³+x) + 5 -->
+  <rect x="475" y="38" width="44" height="44" rx="22" fill="#059669" opacity="0.10" stroke="#059669" stroke-width="1.5"/>
+  <text x="497" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="#059669">+</text>
+
+  <!-- Wire → y -->
+  <line x1="519" y1="60" x2="556" y2="60" stroke="#78716c" stroke-width="1.3" marker-end="url(#arrowB)"/>
+
+  <!-- Output: y -->
+  <rect x="560" y="44" width="44" height="32" rx="6" fill="#059669" opacity="0.15" stroke="#059669" stroke-width="1.5"/>
+  <text x="582" y="65" text-anchor="middle" font-size="15" font-weight="600" font-style="italic" fill="#059669">y</text>
+
+  <!-- Legend -->
+  <rect x="120" y="164" width="14" height="14" rx="7" fill="#2563eb" opacity="0.10" stroke="#2563eb" stroke-width="1"/>
+  <text x="140" y="176" font-size="10.5" fill="#78716c">Multiplication gate</text>
+  <rect x="270" y="164" width="14" height="14" rx="7" fill="#059669" opacity="0.10" stroke="#059669" stroke-width="1"/>
+  <text x="290" y="176" font-size="10.5" fill="#78716c">Addition gate</text>
+  <rect x="400" y="164" width="14" height="14" rx="3" fill="#7c3aed" opacity="0.12" stroke="#7c3aed" stroke-width="1"/>
+  <text x="420" y="176" font-size="10.5" fill="#78716c">Input</text>
+  <rect x="470" y="164" width="14" height="14" rx="3" fill="#d97706" opacity="0.12" stroke="#d97706" stroke-width="1"/>
+  <text x="490" y="176" font-size="10.5" fill="#78716c">Constant</text>
+</svg>
+</div>
+
+<h3 id="s5-2">5.2 From Circuits to Constraints (R1CS)</h3>
+
+<p><strong>R1CS</strong> (Rank-1 Constraint System) is a way to encode an arithmetic circuit as a system of equations. Each multiplication gate becomes a constraint of the form:</p>
+$$(\vec{a} \cdot \vec{w}) \times (\vec{b} \cdot \vec{w}) = (\vec{c} \cdot \vec{w})$$
+<p>where $\vec{w}$ is the vector of all wire values (inputs, intermediates, outputs), and $\vec{a}, \vec{b}, \vec{c}$ are selector vectors. Addition is "free" and can be folded into the linear combinations.</p>
+
+<div class="example-box">
+<span class="label">Example &mdash; R1CS for $y = x^3 + x + 5$</span>
+<p>Using the circuit from above, we introduce intermediate variables: $s_1 = x \cdot x = x^2$ and $s_2 = s_1 \cdot x = x^3$. The output is $y = s_2 + x + 5$. The witness vector is:</p>
+$$\vec{w} = (1,\; x,\; y,\; s_1,\; s_2)$$
+<p>where the leading 1 is a constant term. Each multiplication gate becomes one R1CS constraint:</p>
+
+<table>
+<thead><tr><th>Gate</th><th>$\vec{a} \cdot \vec{w}$</th><th>$\times$</th><th>$\vec{b} \cdot \vec{w}$</th><th>$=$</th><th>$\vec{c} \cdot \vec{w}$</th></tr></thead>
+<tbody>
+<tr><td>$s_1 = x \cdot x$</td><td>$x$</td><td>$\times$</td><td>$x$</td><td>$=$</td><td>$s_1$</td></tr>
+<tr><td>$s_2 = s_1 \cdot x$</td><td>$s_1$</td><td>$\times$</td><td>$x$</td><td>$=$</td><td>$s_2$</td></tr>
+<tr><td>$y = s_2 + x + 5$</td><td>$s_2 + x + 5$</td><td>$\times$</td><td>$1$</td><td>$=$</td><td>$y$</td></tr>
+</tbody>
+</table>
+
+<p>The third constraint uses a trick: addition is encoded as multiplication by 1, since $(s_2 + x + 5) \times 1 = y$. Written as selector vectors:</p>
+$$\vec{a}_3 = (5, 1, 0, 0, 1), \quad \vec{b}_3 = (1, 0, 0, 0, 0), \quad \vec{c}_3 = (0, 0, 1, 0, 0)$$
+<p>Verify: $\vec{a}_3 \cdot \vec{w} = 5 \cdot 1 + 1 \cdot x + 1 \cdot s_2 = s_2 + x + 5$, $\;\vec{b}_3 \cdot \vec{w} = 1$, $\;\vec{c}_3 \cdot \vec{w} = y$.</p>
+</div>
+
+<p>While R1CS is used in systems like Groth16, Halo2 uses a more expressive format called <strong>PLONKish arithmetization</strong>.</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s6">6. PLONKish Arithmetization</h2>
+
+<p>PLONKish is the constraint system used by Halo2. It generalizes R1CS by organizing computation into a <strong>table</strong> (like a spreadsheet) with custom gates and lookup arguments.</p>
+
+<h3 id="s6-1">6.1 The Execution Trace Table</h3>
+
+<p>The computation is laid out in a table with $n$ rows and several types of columns:</p>
+
+<table>
+<thead><tr><th>Column Type</th><th>Symbol</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td>Advice</td><td>$a_i$</td><td>Private witness values (the prover fills these)</td></tr>
+<tr><td>Instance</td><td>$x_i$</td><td>Public inputs/outputs (known to both prover &amp; verifier)</td></tr>
+<tr><td>Fixed</td><td>$f_i$</td><td>Constants baked into the circuit (selector values, lookup tables)</td></tr>
+<tr><td>Selector</td><td>$q_i$</td><td>Binary columns that activate/deactivate gates per row</td></tr>
+</tbody>
+</table>
+
+<div class="example-box">
+<span class="label">Example &mdash; Arithmetic Gate</span>
+A single PLONKish custom gate with advice columns $a, b, c$ and selectors $q_M, q_L, q_R, q_O, q_C$:
+$$q_M \cdot a \cdot b \;+\; q_L \cdot a \;+\; q_R \cdot b \;+\; q_O \cdot c \;+\; q_C = 0.$$
+By setting different selector values, this one gate template can express:
+<ul style="margin-top:0.5rem;">
+  <li><strong>Multiplication:</strong> $q_M=1, q_O=-1$, rest $0$ &rarr; $a \cdot b = c$.</li>
+  <li><strong>Addition:</strong> $q_L=1, q_R=1, q_O=-1$ &rarr; $a + b = c$.</li>
+  <li><strong>Constant:</strong> $q_L=1, q_C=-7$ &rarr; $a = 7$.</li>
+</ul>
+</div>
+
+<h3 id="s6-2">6.2 Custom Gates</h3>
+
+<p>PLONKish allows <strong>custom gates</strong>&mdash;polynomial constraints of arbitrary degree involving any combination of columns, even across adjacent rows (via "rotation"). For example, a gate can reference $a_i(\text{row}_j)$ and $a_i(\text{row}_{j+1})$ simultaneously.</p>
+
+<p>In Halo2-base (used by this project), the primary gate is the <strong>FlexGate</strong>:</p>
+$$q \cdot \bigl(a \cdot b \cdot c_{\text{mul}} + a \cdot c_a + b \cdot c_b + c \cdot c_c + d \cdot c_d + \text{const}\bigr) = 0$$
+<p>This can encode any combination of multiply-and-add in a single gate.</p>
+
+<h3 id="s6-3">6.3 Lagrange Interpolation</h3>
+
+<p>Before we can turn the execution trace into polynomials, we need a tool that converts a table of values into a polynomial. <strong>Lagrange interpolation</strong> does exactly this.</p>
+
+<div class="definition">
+<span class="label">Definition 6.2 &mdash; Lagrange Interpolation</span>
+Given $n$ distinct points $x_0, x_1, \dots, x_{n-1}$ and corresponding values $y_0, y_1, \dots, y_{n-1}$, there exists a <strong>unique</strong> polynomial $p(X)$ of degree $< n$ such that $p(x_i) = y_i$ for all $i$. It is:
+$$p(X) = \sum_{i=0}^{n-1} y_i \cdot L_i(X), \qquad \text{where} \quad L_i(X) = \prod_{\substack{j=0 \\ j \neq i}}^{n-1} \frac{X - x_j}{x_i - x_j}.$$
+Each $L_i$ is a <strong>Lagrange basis polynomial</strong>: it equals 1 at $x_i$ and 0 at every other $x_j$.
+</div>
+
+<div class="example-box">
+<span class="label">Example &mdash; Interpolating 3 points</span>
+<p>Find the polynomial through $(1, 3)$, $(2, 7)$, $(4, 15)$.</p>
+<p>The Lagrange basis polynomials are:</p>
+$$\begin{aligned}
+L_0(X) &= \frac{(X-2)(X-4)}{(1-2)(1-4)} = \frac{(X-2)(X-4)}{3}, \\[6pt]
+L_1(X) &= \frac{(X-1)(X-4)}{(2-1)(2-4)} = \frac{(X-1)(X-4)}{-2}, \\[6pt]
+L_2(X) &= \frac{(X-1)(X-2)}{(4-1)(4-2)} = \frac{(X-1)(X-2)}{6}.
+\end{aligned}$$
+<p>So $p(X) = 3 \cdot L_0(X) + 7 \cdot L_1(X) + 15 \cdot L_2(X)$. Expanding and simplifying gives $p(X) = X^2 - X + 3$. Verify: $p(1) = 3$, $p(2) = 7$, $p(4) = 15$.</p>
+</div>
+
+<div class="info-box">
+<strong>Why Lagrange basis?</strong> The trick is that $L_i(x_j) = 0$ when $j \neq i$ (because the numerator contains $(x_j - x_j) = 0$), and $L_i(x_i) = 1$ (because numerator equals denominator). So $p(x_i) = \sum_j y_j \cdot L_j(x_i) = y_i \cdot 1 + \sum_{j \neq i} y_j \cdot 0 = y_i$.
+</div>
+
+<h3 id="s6-4">6.4 From Table to Polynomials</h3>
+
+<p>The execution trace table has $n$ rows. We associate each row $i$ with a root of unity $\omega^i$, where $H = \{1, \omega, \omega^2, \dots, \omega^{n-1}\}$ and $\omega$ is a primitive $n$-th root of unity in $\mathbb{F}_p$ (see Section 1.1).</p>
+
+<p>Each column is then <strong>Lagrange-interpolated</strong> into a polynomial that "encodes" all its row values. For example, if the advice column has values $a_0, a_1, \dots, a_{n-1}$, the Lagrange formula from Section 6.3 gives us the unique polynomial $a(X)$ of degree $< n$ such that:</p>
+$$a(\omega^0) = a_0, \quad a(\omega^1) = a_1, \quad \dots, \quad a(\omega^{n-1}) = a_{n-1}.$$
+<p>The same is done for every column ($b(X)$, $c(X)$, $q_M(X)$, etc.). The special structure of the evaluation points (roots of unity) means this interpolation can be done efficiently using the <strong>Number Theoretic Transform</strong> (NTT)&mdash;the finite-field analogue of the FFT&mdash;in $O(n \log n)$ time instead of the naive $O(n^2)$.</p>
+
+<div class="info-box">
+<strong>Why $O(n \log n)$?</strong> The idea is analogous to fast exponentiation ($a^n$ in $O(\log n)$ by repeated squaring). Since $n = 2^k$, a polynomial can be split into its even- and odd-indexed coefficients: $a(X) = a_{\text{even}}(X^2) + X \cdot a_{\text{odd}}(X^2)$. The key property of roots of unity is that <strong>squaring the $n$-th roots gives the $(n/2)$-th roots</strong>, so each half is the same problem at half the size. This gives the recursion $T(n) = 2\,T(n/2) + O(n) = O(n \log n)$. It is also why Halo2 requires $n$ to be a power of two.
+</div>
+
+<p>Now, a gate constraint like "the multiplication gate holds at row $i$" becomes $q_M(\omega^i) \cdot a(\omega^i) \cdot b(\omega^i) - c(\omega^i) = 0$. If this holds at <em>every</em> row, then the polynomial</p>
+$$g(X) = q_M(X) \cdot a(X) \cdot b(X) - c(X)$$
+<p>has every element of $H$ as a root: $g(\omega^i) = 0$ for all $i = 0, \dots, n-1$. Note that $X \in \mathbb{F}_p$ (not just $H$)&mdash;the constraint must hold on $H$, but $g(X)$ is a polynomial over all of $\mathbb{F}_p$, which is why the verifier can later check at a random $\zeta \notin H$.</p>
+
+<p>By the factor theorem (Section 4.3), this means $(X - \omega^i)$ divides $g(X)$ for each $i$. Since all $n$ roots divide $g(X)$, the product</p>
+$$Z_H(X) = (X - 1)(X - \omega)(X - \omega^2) \cdots (X - \omega^{n-1}) = X^n - 1$$
+<p>divides $g(X)$. This polynomial $Z_H(X)$ is called the <strong>vanishing polynomial</strong> of $H$.</p>
+
+<div class="theorem">
+<span class="label">Why $Z_H(X) = X^n - 1$</span>
+The elements $1, \omega, \omega^2, \dots, \omega^{n-1}$ are precisely the $n$ solutions to $X^n = 1$ (by definition of $n$-th roots of unity: $(\omega^i)^n = (\omega^n)^i = 1^i = 1$). So $X^n - 1$ is a degree-$n$ monic polynomial that vanishes at all $n$ elements of $H$. But the product $(X-1)(X-\omega)\cdots(X-\omega^{n-1})$ is <em>also</em> a degree-$n$ monic polynomial that vanishes at exactly the same $n$ points. Since a degree-$n$ polynomial is uniquely determined by its $n$ roots and leading coefficient, the two must be equal.
+</div>
+
+<div class="info-box">
+<strong>Connection to KZG (Section 4.3):</strong> In KZG, we proved $f(z) = v$ by showing $(x - z)$ divides $f(x) - v$, i.e., one evaluation at one point. Here, we need to prove that a constraint holds at <em>all $n$ rows simultaneously</em>. The idea is the same, but instead of dividing by $(X - z)$ (one root), we divide by $Z_H(X) = X^n - 1$ (all $n$ roots at once).
+</div>
+
+<p>The prover demonstrates this by exhibiting a <strong>quotient polynomial</strong> $t(X)$ such that:</p>
+$$q_M(X) \cdot a(X) \cdot b(X) - c(X) = t(X) \cdot Z_H(X).$$
+<p>The verifier then uses KZG to check that this identity holds&mdash;but not by checking every point. Instead, the verifier checks at a <em>single random point</em> $\zeta$. The Schwartz-Zippel lemma explains why this is sufficient.</p>
+
+<h3 id="s6-5">6.5 The Schwartz-Zippel Lemma</h3>
+
+<p>A key question: if the prover gives us polynomials and claims they satisfy an identity $g(X) = t(X) \cdot Z_H(X)$, why is it enough to check this at a <em>single</em> random point $\zeta$? The answer is one of the most useful lemmas in theoretical computer science:</p>
+
+<div class="theorem">
+<span class="label">Theorem 6.1 &mdash; Schwartz-Zippel Lemma</span>
+Let $h(X)$ be a nonzero polynomial of degree $d$ over a field $\mathbb{F}$. If $\zeta$ is chosen <strong>uniformly at random</strong> from a subset $S \subseteq \mathbb{F}$, then:
+$$\Pr[h(\zeta) = 0] \;\leq\; \frac{d}{|S|}.$$
+A nonzero polynomial of degree $d$ has <em>at most</em> $d$ roots, so a random evaluation is unlikely to hit one.
+</div>
+
+<p>How does this apply? Suppose the constraint polynomial identity does <em>not</em> hold: $g(X) - t(X) \cdot Z_H(X) \neq 0$. This difference polynomial has degree at most $D$ (a few times $n$). If the verifier picks $\zeta$ at random from $\mathbb{F}_p$, the probability that the check $g(\zeta) = t(\zeta) \cdot Z_H(\zeta)$ falsely passes is:</p>
+$$\Pr[\text{false accept}] \;\leq\; \frac{D}{p} \;\approx\; \frac{2^{20}}{2^{254}} \;\approx\; 2^{-234}.$$
+<p>This is astronomically small. In other words: if the identity is wrong anywhere, a random check catches it with overwhelming probability.</p>
+
+<div class="info-box">
+<strong>The power of random evaluation:</strong> Without Schwartz-Zippel, the verifier would need to check the polynomial identity at every point in $H$ (all $n$ rows)&mdash;defeating the purpose of succinctness. Schwartz-Zippel compresses $n$ checks into <strong>one</strong> random check, with negligible error probability. This is why the random challenge $\zeta$ in the Halo2 protocol (Section 7) is so important: it turns a polynomial identity over all of $H$ into a single-point verification.
+</div>
+
+<h3 id="s6-6">6.6 Permutation Arguments (Copy Constraints)</h3>
+
+<p>Gate constraints check that each row satisfies a local equation. But circuits also need to ensure that a value at one position in the table <strong>equals</strong> a value at another position&mdash;for example, that the output of gate 1 is the same as an input to gate 5. A <strong>cell</strong> refers to a specific (column, row) entry in the execution trace table from Section 6.1. These equality requirements are called <strong>copy constraints</strong>, and they are enforced by a <strong>permutation argument</strong>.</p>
+
+<h4>The idea</h4>
+
+<p>Suppose we have a set of cells that should all contain the same value. In the execution trace, these cells might be at different rows and columns. We define a <strong>permutation</strong> $\sigma$ that maps each cell to the next cell in its "equality group"&mdash;forming a cycle. If cell $A$ should equal cells $B$ and $C$, then $\sigma(A) = B$, $\sigma(B) = C$, $\sigma(C) = A$.<sup>*</sup></p>
+
+<p style="font-size:0.82rem; color:var(--dim);"><sup>*</sup> In other words, $\sigma$ acts as a circular shift within each equality group. The full permutation is a collection of disjoint cycles: one cycle per group of cells that must share the same value. Cells with no copy constraint simply map to themselves ($\sigma(F) = F$, a trivial 1-cycle).</p>
+
+<p>The claim "all cells in each cycle have equal values" is equivalent to: the column polynomials evaluated at the permuted positions give the same values as at the original positions.</p>
+
+<h4>Grand product argument</h4>
+
+<p>To check that two lists $(v_0, \dots, v_{n-1})$ and $(v_{\sigma(0)}, \dots, v_{\sigma(n-1)})$ are the same multiset (which, combined with the permutation structure, implies element-wise equality within each cycle), PLONK uses a <strong>grand product</strong>. Here $v_i = a(\omega^i)$ is the column polynomial evaluated at the $i$-th root of unity, i.e., the cell value at row $i$ (from Section 6.4). The verifier sends random challenges $\beta, \gamma$, and the prover constructs an accumulator polynomial $Z(X)$ such that:</p>
+
+$$Z(\omega^0) = 1, \qquad Z(\omega^{i+1}) = Z(\omega^i) \cdot \frac{v_i + \beta \cdot \omega^i + \gamma}{v_i + \beta \cdot \sigma(\omega^i) + \gamma}.$$
+
+<p>The key insight: if the values respect the permutation (i.e., $v_i = v_{\sigma(i)}$ within each cycle), then the product equals 1:</p>
+$$Z(\omega^n) = \prod_{i=0}^{n-1} \frac{v_i + \beta \cdot \omega^i + \gamma}{v_i + \beta \cdot \sigma(\omega^i) + \gamma} = 1.$$
+
+<div class="theorem">
+<span class="label">Why the product is 1</span>
+Consider a single cycle $\sigma: \omega^a \to \omega^b \to \omega^c \to \omega^a$. Copy constraints force $v_a = v_b = v_c = v$. The factors from these three indices are:
+$$\begin{aligned}
+\frac{\text{Numerator}}{\text{Denominator}}
+&= \frac{(v + \beta\omega^a + \gamma)(v + \beta\omega^b + \gamma)(v + \beta\omega^c + \gamma)}{(v + \beta\,\sigma(\omega^a) + \gamma)(v + \beta\,\sigma(\omega^b) + \gamma)(v + \beta\,\sigma(\omega^c) + \gamma)} \\[6pt]
+&= \frac{(v + \beta\omega^a + \gamma)(v + \beta\omega^b + \gamma)(v + \beta\omega^c + \gamma)}{(v + \beta\omega^b + \gamma)(v + \beta\omega^c + \gamma)(v + \beta\omega^a + \gamma)} \\[6pt]
+&= 1.
+\end{aligned}$$
+The denominator contains the <em>same</em> factors as the numerator, just reordered by $\sigma$. Since every index belongs to exactly one cycle, the full product is 1.
+</div>
+
+<p>If any copy constraint is violated, the product will (with overwhelming probability over the random $\beta, \gamma$) <em>not</em> equal 1.</p>
+
+<div class="example-box">
+<span class="label">Example &mdash; Copy constraint</span>
+<p>Suppose column $a$ at row 0 should equal column $b$ at row 2. In the permutation, the cell $(a, 0)$ is mapped to $(b, 2)$ and vice versa. If the prover puts $a(\omega^0) = 7$ and $b(\omega^2) = 7$, the corresponding factors in the grand product cancel, and $Z$ cycles back to 1. If the prover cheats and puts $b(\omega^2) = 9$, the factors don't cancel, and $Z(\omega^n) \neq 1$.</p>
+</div>
+
+<p>The polynomial $Z(X)$ is committed via KZG, and the recurrence relation and the boundary condition $Z(\omega^n) = 1$ are checked as additional polynomial constraints (folded into the quotient polynomial from Section 6.4).</p>
+
+<div class="info-box">
+<strong>Why randomness?</strong> Without $\beta$ and $\gamma$, a cheating prover could construct values that make the product equal 1 even when the permutation is violated (by finding cancellations in the product). The random challenges ensure that such cancellations happen with negligible probability (by Schwartz-Zippel from Section 6.5).
+</div>
+
+<h3 id="s6-7">6.7 Lookup Arguments</h3>
+
+<p>Some constraints are hard to express as low-degree polynomial equations (e.g., "this value is a valid 8-bit integer"). <strong>Lookup arguments</strong> solve this: the prover shows that a set of values is contained in a predefined table.</p>
+
+<div class="definition">
+<span class="label">Definition 6.1 &mdash; Lookup Argument</span>
+Given a <strong>lookup table</strong> $T = \{t_1, t_2, \dots, t_N\}$ (a fixed column), a lookup argument proves that for each active row $i$, the advice value $a_i \in T$. In this project, the table is $T = \{0, 1, 2, \dots, 2^{\ell} - 1\}$ with $\ell = $ <code>LOOKUP_BITS</code> (typically 15). This efficiently proves <strong>range checks</strong>: $0 \leq x < 2^{\ell}$.
+</div>
+
+<h4>Why not just use polynomial gates?</h4>
+
+<p>Consider proving that a value $x$ is an 8-bit integer, i.e., $0 \leq x < 256$. Without lookups, you would need to decompose $x$ into 8 individual bits $b_0, \dots, b_7$, constrain each $b_i \in \{0,1\}$ (via $b_i(b_i - 1) = 0$), and verify $x = \sum_{i=0}^{7} b_i \cdot 2^i$. That is 8 extra witness variables and 9 constraints for a single range check. With a lookup table $T = \{0, 1, \dots, 255\}$, you prove $x \in T$ in a single step.</p>
+
+<h4>How lookups work (intuition)</h4>
+
+<p>The core idea is a <strong>set-membership test via sorted permutations</strong>. At a high level:</p>
+
+<ol>
+  <li>Let $\vec{f} = (f_1, f_2, \dots, f_m)$ be the values the prover wants to look up, and $\vec{t} = (t_1, t_2, \dots, t_N)$ be the fixed table.</li>
+  <li>The prover produces a <strong>sorted combination</strong>: merge $\vec{f}$ and $\vec{t}$ into a single sorted list $\vec{s}$. If every $f_i$ is indeed in $T$, then $\vec{s}$ is just $\vec{t}$ with some entries repeated.</li>
+  <li>The verifier checks (via polynomial constraints) that:
+    <ul>
+      <li>$\vec{s}$ is a valid interleaving of $\vec{f}$ and $\vec{t}$ (a permutation argument).</li>
+      <li>$\vec{s}$ is sorted, and consecutive elements in $\vec{s}$ that differ must appear in $\vec{t}$ (no new values were introduced).</li>
+    </ul>
+  </li>
+</ol>
+
+<p>All of these checks are encoded as polynomial identities over the roots of unity, so they fit naturally into the PLONKish framework from Section 6.4.</p>
+
+<h4>The polynomial constraints</h4>
+
+<p>The prover constructs two auxiliary column polynomials: $A'(X)$ (the lookup values permuted into table order) and $S'(X)$ (the table values repeated to match). Three polynomial constraints enforce correctness:</p>
+
+<p><strong>1. Grand product</strong> (same idea as the permutation argument in Section 6.6). With random challenges $\beta, \gamma$, the prover builds an accumulator $Z(X)$:</p>
+$$Z(\omega \cdot X) \cdot (A'(X) + \beta) \cdot (S'(X) + \gamma) = Z(X) \cdot (f(X) + \beta) \cdot (t(X) + \gamma)$$
+<p>with boundary $Z(\omega^0) = 1$. This ensures $(A', S')$ is a valid permutation of $(f, t)$.</p>
+
+<p><strong>2. Boundary</strong>. The product must return to 1 after all rows:</p>
+$$L_0(X) \cdot (Z(X) - 1) = 0 \quad \text{on } H$$
+<p>where $L_0(X)$ is the Lagrange basis polynomial for row 0 (from Section 6.3: equals 1 at $\omega^0$, 0 elsewhere).</p>
+
+<p><strong>3. Sorting / adjacency</strong>. This is the key constraint:</p>
+$$(A'(X) - S'(X)) \cdot (A'(X) - A'(\omega^{-1} \cdot X)) = 0 \quad \text{on } H$$
+<p>At each row, <strong>either</strong> $A'(X) = S'(X)$ (the value matches the table at this position) <strong>or</strong> $A'(X) = A'(\omega^{-1} \cdot X)$ (the value equals the previous row&mdash;a repeated lookup). This ensures no value outside $T$ can appear in $A'$: every "run" of equal values must start at a position matching the table $S'$.</p>
+
+<p>All three are polynomial identities that vanish on $H$, so they get folded into the quotient polynomial $t(X) \cdot Z_H(X)$ from Section 6.4.</p>
+
+<div class="example-box">
+<span class="label">Example &mdash; Range check via lookup</span>
+<p>Suppose the table is $T = \{0, 1, 2, 3\}$ (2-bit range) and the prover wants to prove $f_1 = 2$ and $f_2 = 1$ are both in $T$. The sorted combination is $\vec{s} = (0, 1, 1, 2, 2, 3)$. Each consecutive pair in $\vec{s}$ either stays the same or increases by an amount that matches a gap in $T$, confirming no value outside $T$ was smuggled in.</p>
+<p>If the prover tried $f_1 = 5$, the sorted list would contain $(\dots, 3, 5, \dots)$. The gap $3 \to 5$ skips over 4, which is not in $T$, and the polynomial constraint would fail.</p>
+</div>
+
+<p>Range checks are essential for fixed-point arithmetic (ensuring values don't overflow) and for comparison operations (is $a < b$?).</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s7">7. The Halo2 Proving System</h2>
+
+<p>Halo2 combines PLONKish arithmetization with KZG polynomial commitments to create a complete proof system. Here is the high-level protocol:</p>
+
+<h3 id="s7-1">7.1 The Fiat-Shamir Transform</h3>
+
+<p>The polynomial commitment protocol from Section 4 is <strong>interactive</strong>: the verifier must send a random challenge $\zeta$, and the prover must respond. This requires the verifier to be online during proof generation. The <strong>Fiat-Shamir transform</strong> eliminates this interaction, producing a <strong>non-interactive</strong> proof.</p>
+
+<div class="definition">
+<span class="label">Definition 7.1 &mdash; Fiat-Shamir Heuristic</span>
+Instead of the verifier sampling a random challenge, the prover computes it as a <strong>hash of the transcript</strong> so far (all messages exchanged up to that point):
+$$\zeta = \text{Hash}(\text{transcript})$$
+The transcript includes all commitments, public inputs, and any prior challenges. Since a cryptographic hash (Halo2 uses Blake2b or Poseidon) behaves like a random oracle, the prover cannot predict or manipulate $\zeta$ without changing the commitments, which would change the hash.
+</div>
+
+<p>Here is how it works step by step:</p>
+<ol>
+  <li>The prover commits to the witness polynomials and appends the commitments to a running <strong>transcript</strong>.</li>
+  <li>When a random challenge is needed, the prover hashes the transcript to derive it: $\alpha = \text{Hash}(\text{transcript})$.</li>
+  <li>The challenge $\alpha$ is appended to the transcript, and the process continues.</li>
+  <li>The verifier independently reconstructs the transcript from the proof, re-derives all challenges via the same hashing, and checks everything matches.</li>
+</ol>
+
+<div class="info-box">
+<strong>Why is this secure?</strong> The random oracle model treats the hash function as a truly random function. A cheating prover would need to find commitments that, when hashed, produce a challenge that makes a false proof verify&mdash;but this requires inverting or finding collisions in the hash, which is computationally infeasible. The result: a proof that anyone can verify at any time, with no interaction.
+</div>
+
+<h3 id="s7-2">7.2 Proof Generation (Prover)</h3>
+
+<ol>
+  <li><strong>Fill the table:</strong> The prover computes the witness and fills in all advice columns.</li>
+  <li><strong>Commit to columns:</strong> Interpolate each advice column into a polynomial and compute KZG commitments:
+  $$C_{a_i} = [a_i(\tau)]G_1.$$</li>
+  <li><strong>Permutation accumulator:</strong> Compute the grand product polynomial $Z(X)$ from Section 6.6 that enforces copy constraints, and commit to it.</li>
+  <li><strong>Construct constraint polynomial:</strong> Combine all gate constraints, lookup arguments, and permutation checks (weighted by random challenges $\alpha, \beta, \gamma$ derived via Fiat-Shamir) into a single polynomial identity:
+  $$\sum_j \alpha^j \cdot g_j(X) \equiv 0 \pmod{Z_H(X)}.$$</li>
+  <li><strong>Compute quotient polynomial:</strong> $t(X) = \frac{\sum_j \alpha^j \cdot g_j(X)}{Z_H(X)}$, and commit to it.</li>
+  <li><strong>Open evaluations:</strong> At a random challenge point $\zeta$ (derived via the Fiat-Shamir transform from Section 7.1), the prover evaluates all polynomials and provides KZG opening proofs.</li>
+</ol>
+
+<h3 id="s7-3">7.3 Verification (Verifier)</h3>
+
+<ol>
+  <li>Reconstruct the random challenges from the transcript using the Fiat-Shamir transform (Section 7.1).</li>
+  <li>Check the constraint polynomial identity at $\zeta$:
+  $$\sum_j \alpha^j \cdot g_j(\zeta) \stackrel{?}{=} t(\zeta) \cdot Z_H(\zeta).$$</li>
+  <li>Verify all KZG opening proofs using pairing checks.</li>
+</ol>
+
+<p>This project uses the <strong>SHPLONK</strong> multi-opening strategy, which batches multiple polynomial openings into a single pairing check for efficiency.</p>
+
+<h3 id="s7-4">7.4 Circuit Parameters</h3>
+
+<table>
+<thead><tr><th>Parameter</th><th>Meaning</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td>$k$ (<code>DEGREE</code>)</td><td>Circuit has $\leq 2^k$ rows</td><td>18</td></tr>
+<tr><td><code>LOOKUP_BITS</code></td><td>Lookup table size $2^{\ell}$</td><td>15</td></tr>
+<tr><td>Blinding factors</td><td>Random rows for zero-knowledge</td><td>9</td></tr>
+</tbody>
+</table>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s8">8. Fixed-Point Arithmetic in $\mathbb{F}_p$</h2>
+
+<p>Finite fields have no fractions&mdash;there is no $0.5$ in $\mathbb{F}_p$. To do machine learning (which needs decimal numbers), this project uses <strong>fixed-point quantization</strong>: represent real numbers as scaled integers.</p>
+
+<figure>
+<img src="../figure/workflow_fixed_point_sanity_check.png" alt="FixedPointChip workflow: real input is quantized into a BN254 field element, computed inside the ZK circuit, then dequantized back to a real number." style="max-width:480px; width:100%;">
+<figcaption>The FixedPointChip pipeline: a real number (e.g., $\pi/4$) is <strong>quantized</strong> into a field element, processed by the ZK circuit (e.g., $\sin$), then <strong>dequantized</strong> back. The hex values are BN254 field elements.</figcaption>
+</figure>
+
+<h3 id="s8-1">8.1 Quantization Scheme</h3>
+
+<div class="definition">
+<span class="label">Definition 8.1 &mdash; Fixed-Point Representation</span>
+Choose a precision parameter $P$ (number of fractional bits). A real number $x \in \mathbb{R}$ is represented as:
+$$x_q = \lfloor x \cdot 2^P \rceil \in \mathbb{F}_p$$
+where $\lfloor \cdot \rceil$ denotes rounding to the nearest integer. To recover the approximate real value:
+$$\hat{x} = x_q / 2^P.$$
+The scaling factor $S = 2^P$ is called the <strong>quantization scale</strong>.
+</div>
+
+<p>This project supports $P \in [32, 63]$. With $P = 32$, we get a "32.32" format: 32 bits for the integer part and 32 bits for the fractional part, giving roughly 9 decimal digits of precision.</p>
+
+<div class="example-box">
+<span class="label">Example ($P = 32$)</span>
+$\pi \approx 3.14159265$:
+$$\pi_q = \lfloor 3.14159265 \times 2^{32} \rceil = \lfloor 3.14159265 \times 4294967296 \rceil = 13493037705.$$
+De-quantization: $13493037705 / 4294967296 \approx 3.14159265$.
+</div>
+
+<h3 id="s8-2">8.2 Handling Negative Numbers</h3>
+
+<p>Since $\mathbb{F}_p$ contains only elements $\{0, 1, \dots, p-1\}$, negative numbers use <strong>modular wraparound</strong>:</p>
+$$\text{Encode}(-x) = p - x_q + 1 \equiv -x_q \pmod{p}.$$
+
+<figure>
+<img src="../figure/quantization.png" alt="Quantization scheme and BN254 number line showing positive numbers in the lower range and negative numbers wrapping around from M." style="max-width:380px; width:100%;">
+<figcaption>Symmetric quantization with the BN254 number line. Positive values occupy $[0, 2^p - 1]$; negative values wrap around from $M$ (the field modulus), occupying $[M - 2^p, M]$.</figcaption>
+</figure>
+
+<p>The chip defines a <strong>negative threshold</strong>:</p>
+$$\text{negative\_point} = p - 2^{2P+1} + 1.$$
+<p>Any value $v > \text{negative\_point}$ is interpreted as negative. The valid range is $(-2^{2P},\; 2^{2P})$.</p>
+
+<h3 id="s8-3">8.3 Arithmetic Operations</h3>
+
+<h4>Addition and Subtraction</h4>
+<p>These work directly in $\mathbb{F}_p$ because quantization is linear:</p>
+$$x_q + y_q = (x + y)_q, \qquad x_q - y_q = (x - y)_q.$$
+
+<h4>Multiplication</h4>
+<p>Multiplying two quantized values gives a double-scaled result:</p>
+$$x_q \cdot y_q = (x \cdot 2^P)(y \cdot 2^P) = xy \cdot 2^{2P}.$$
+<p>We must <strong>rescale</strong> by dividing by $2^P$:</p>
+$$\text{qmul}(x_q, y_q) = \frac{x_q \cdot y_q}{2^P} = xy \cdot 2^P = (xy)_q.$$
+<p>In the circuit, this division is implemented via the range chip's <code>div_mod</code> operation with a range check to ensure correctness.</p>
+
+<h4>Division</h4>
+<p>Division requires pre-scaling to maintain precision:</p>
+$$\text{qdiv}(x_q, y_q) = \frac{x_q \cdot 2^P}{y_q} = \frac{x \cdot 2^{2P}}{y \cdot 2^P} = \frac{x}{y} \cdot 2^P = (x/y)_q.$$
+
+<p>For signed division, the chip extracts signs, operates on absolute values, then restores the sign via XOR of the sign bits:</p>
+$$\text{sign}(x/y) = \text{sign}(x) \oplus \text{sign}(y).$$
+
+<h4>Summary of Rescaling</h4>
+
+<table>
+<thead><tr><th>Operation</th><th>Raw Result</th><th>Rescaling</th><th>Circuit Cost</th></tr></thead>
+<tbody>
+<tr><td>$x + y$</td><td>$x_q + y_q$</td><td>None</td><td>1 add gate</td></tr>
+<tr><td>$x - y$</td><td>$x_q - y_q$</td><td>None</td><td>1 sub gate</td></tr>
+<tr><td>$x \times y$</td><td>$x_q y_q$</td><td>$\div 2^P$</td><td>1 mul + 1 div_mod + range check</td></tr>
+<tr><td>$x / y$</td><td>$x_q \cdot 2^P / y_q$</td><td>Pre-scale $\times 2^P$</td><td>1 mul + 1 div_mod_var + range check + sign</td></tr>
+</tbody>
+</table>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s9">9. Polynomial Function Approximation</h2>
+
+<p>Machine learning needs transcendental functions like $e^x$, $\log x$, $\sin x$, and $\sigma(x) = 1/(1+e^{-x})$. These cannot be computed exactly in a finite field&mdash;but they can be <em>approximated</em> with polynomials, which are native to our constraint system.</p>
+
+<h3 id="s9-1">9.1 The Remez Algorithm</h3>
+
+<p>The <strong>Remez exchange algorithm</strong> finds the polynomial of degree $d$ that minimizes the <em>maximum</em> approximation error (the $L^\infty$ or minimax error) over an interval $[a, b]$:</p>
+
+$$p^*(x) = \arg\min_{p \in \mathcal{P}_d} \;\max_{x \in [a,b]}\; |f(x) - p(x)|.$$
+
+<div class="theorem">
+<span class="label">Theorem 9.1 &mdash; Chebyshev Equioscillation</span>
+The best minimax polynomial $p^*$ of degree $d$ is characterized by the fact that the error $f(x) - p^*(x)$ <strong>equioscillates</strong>: it attains its maximum absolute value at least $d+2$ times with alternating signs. This is a consequence of the Chebyshev equioscillation theorem.
+</div>
+
+<p>This project uses Remez-optimized polynomials (generated via <code>reference/remez.py</code>) with the following specifications:</p>
+
+<table>
+<thead><tr><th>Function</th><th>Interval</th><th>Degree</th><th>Max Error</th></tr></thead>
+<tbody>
+<tr><td>$2^x$ (fractional part)</td><td>$[0, 1)$</td><td>12</td><td>$\sim 10^{-11}$</td></tr>
+<tr><td>$\log_2 x$</td><td>$[2, 4)$</td><td>14</td><td>$\sim 6.5 \times 10^{-13}$</td></tr>
+<tr><td>$\sin x$</td><td>$[0, \pi]$</td><td>14</td><td>$\sim 1.9 \times 10^{-15}$</td></tr>
+</tbody>
+</table>
+
+<h3 id="s9-2">9.2 Horner's Method</h3>
+
+<p>Evaluating a polynomial $p(x) = c_0 + c_1 x + c_2 x^2 + \cdots + c_d x^d$ naively requires $O(d^2)$ multiplications. <strong>Horner's method</strong> reduces this to $d$ multiplications:</p>
+$$p(x) = c_0 + x\bigl(c_1 + x\bigl(c_2 + \cdots + x(c_{d-1} + x \cdot c_d)\cdots\bigr)\bigr).$$
+
+<p>In circuit terms, this is a chain of $d$ multiply-add operations, each costing one <code>qmul</code> and one <code>qadd</code>. The implementation in <code>FixedPointChip::polynomial</code> follows exactly this pattern.</p>
+
+<h3 id="s9-3">9.3 Range Reduction</h3>
+
+<p>Polynomial approximations only work well on bounded intervals. To handle arbitrary inputs, we use <strong>range reduction</strong>:</p>
+
+<h4>Exponential: $2^x$</h4>
+<p>Decompose $x = n + f$ where $n = \lfloor x \rfloor$ (integer part) and $f \in [0, 1)$ (fractional part). Then:</p>
+$$2^x = 2^n \cdot 2^f.$$
+<ul>
+  <li>$2^n$ is computed by table lookup (selecting from a precomputed array of powers of two).</li>
+  <li>$2^f$ is computed by the degree-12 Remez polynomial.</li>
+</ul>
+<p>For negative $x$: $2^{-|x|} = 1 / 2^{|x|}$, computed via <code>qdiv</code>.</p>
+<p>Natural exponential uses: $e^x = 2^{x / \ln 2}$.</p>
+
+<h4>Logarithm: $\log_2 x$</h4>
+<p>Find $n$ such that $2^n \leq x < 2^{n+1}$. Then normalize $x' = x / 2^{n-1} \in [2, 4)$ and:</p>
+$$\log_2 x = \log_2 x' + (n - 1).$$
+<p>The polynomial approximates $\log_2$ on $[2, 4)$, and the shift $(n-1)$ is added back. Natural logarithm uses: $\ln x = \log_2 x / \log_2 e$.</p>
+
+<h4>Trigonometric: $\sin x$</h4>
+<p>Reduce $x$ to $[0, 2\pi)$ via modular reduction: $x' = |x| \bmod 2\pi$. Then:</p>
+<ul>
+  <li>If $x' \in [0, \pi)$: compute $\sin(x')$ directly via the degree-14 polynomial.</li>
+  <li>If $x' \in [\pi, 2\pi)$: use $\sin(x') = -\sin(x' - \pi)$.</li>
+</ul>
+<p>Finally, $\sin(-x) = -\sin(x)$ restores the sign. Cosine and tangent are derived:</p>
+$$\cos x = \sin(x + \pi/2), \qquad \tan x = \sin x / \cos x.$$
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s10">10. ZK Machine Learning Circuits</h2>
+
+<p>With fixed-point arithmetic and function approximation in hand, we can build full machine learning algorithms as ZK circuits.</p>
+
+<h3 id="s10-1">10.1 Linear Regression</h3>
+
+<h4>Inference</h4>
+<p>Given weight vector $\mathbf{w} \in \mathbb{R}^d$, bias $b$, and input $\mathbf{x} \in \mathbb{R}^d$:</p>
+$$\hat{y} = \mathbf{w} \cdot \mathbf{x} + b = \sum_{i=1}^d w_i x_i + b.$$
+<p>In circuit: <code>inner_product</code> computes $\sum w_i x_i$ using $d$ <code>qmul</code> + $(d-1)$ <code>qadd</code> gates, then one <code>qadd</code> for the bias.</p>
+
+<h4>Training (Mini-Batch SGD)</h4>
+<p>Given a batch of $m$ samples $\{(\mathbf{x}^{(j)}, y^{(j)})\}_{j=1}^m$, the gradient descent update is:</p>
+
+$$\text{Loss} = \frac{1}{2m} \sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)})^2$$
+
+$$\frac{\partial \text{Loss}}{\partial w_i} = \frac{1}{m} \sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)}) \cdot x_i^{(j)}$$
+
+$$w_i \leftarrow w_i - \eta \cdot \frac{\partial \text{Loss}}{\partial w_i}, \qquad b \leftarrow b - \eta \cdot \frac{1}{m}\sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)})$$
+
+<p>All of these are polynomial operations (multiply, add, subtract) over quantized values, directly expressible as PLONKish constraints.</p>
+
+<figure>
+<img src="../figure/demo_linear_regression_train.png" alt="ZK linear regression training: loss curve showing ZK and non-ZK versions converge with negligible error, alongside proof generation terminal output." style="max-width:680px; width:100%;">
+<figcaption>ZK linear regression training demo. Left: the loss curve (ZK version in blue dashed, non-ZK in red solid) converges with negligible error. Right: Halo2 proof generation and verification output&mdash;proving takes ~23s, verification ~120ms.</figcaption>
+</figure>
+
+<h3 id="s10-2">10.2 Logistic Regression</h3>
+
+<h4>Inference</h4>
+<p>The logistic model uses the <strong>sigmoid</strong> activation:</p>
+$$\hat{y} = \sigma(\mathbf{w} \cdot \mathbf{x} + b) = \frac{1}{1 + e^{-(\mathbf{w} \cdot \mathbf{x} + b)}}.$$
+<p>In circuit: compute the linear part, negate it, apply <code>qexp</code>, add 1, then <code>qdiv</code> by the result. The <code>qexp</code> call chains through $e^x = 2^{x/\ln 2}$, invoking the full range-reduction + polynomial pipeline.</p>
+
+<h4>Training (Binary Cross-Entropy)</h4>
+<p>The loss function is:</p>
+$$\text{BCE} = -\frac{1}{m}\sum_{j=1}^m \bigl[y^{(j)} \ln \hat{y}^{(j)} + (1 - y^{(j)}) \ln(1 - \hat{y}^{(j)})\bigr].$$
+
+<p>The gradient has the same form as linear regression (a well-known simplification):</p>
+$$\frac{\partial \text{BCE}}{\partial w_i} = \frac{1}{m} \sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)}) \cdot x_i^{(j)}.$$
+
+<p>This requires <code>qlog</code> for the loss computation, which in turn uses the log polynomial approximation.</p>
+
+<div class="info-box">
+<strong>Precision note:</strong> Logistic regression uses 63.63 fixed-point precision (vs. 32.32 for linear regression) because the sigmoid and log computations are numerically sensitive and require more fractional bits to maintain accuracy.
+</div>
+
+<h3 id="s10-3">10.3 Decision Tree</h3>
+
+<h4>Inference (Tree Traversal)</h4>
+<p>A decision tree is a binary tree where each internal node stores a feature index $f$ and a threshold $t$. At each node, we branch:</p>
+$$\text{go left if } x_f \leq t, \qquad \text{go right if } x_f > t.$$
+<p>In circuit: each comparison uses <code>RangeInstructions::is_less_than</code>, which decomposes the difference into bits and checks the range&mdash;all via lookup arguments.</p>
+
+<figure>
+<img src="../figure/decision_tree_inference.png" alt="Decision tree inference with path padding: variable-length paths are padded to equal length via self-loops at leaf nodes. Fake nodes (blue dashed) complete the binary tree." style="max-width:420px; width:100%;">
+<figcaption>ZK-friendly tree traversal. <strong>Path padding</strong>: leaf nodes have self-loops so all paths have equal length (ZK circuits require fixed-size computation). <strong>Fake nodes</strong> (blue dashed): added to make the tree a complete binary tree&mdash;they are never reached due to the self-loops at real leaf nodes (yellow).</figcaption>
+</figure>
+
+<h4>Training (Gini Impurity)</h4>
+<p>The tree is built by recursively finding the best split. For a node with $n$ samples containing $n_k$ samples of class $k$:</p>
+$$\text{Gini}(S) = 1 - \sum_k \left(\frac{n_k}{n}\right)^2.$$
+<p>The best split minimizes the weighted Gini impurity of the children:</p>
+$$\text{Split cost} = \frac{|S_L|}{|S|} \cdot \text{Gini}(S_L) + \frac{|S_R|}{|S|} \cdot \text{Gini}(S_R).$$
+
+<p>In circuit, the training uses <strong>bitmasks</strong> to track which samples belong to each subtree, and computes Gini impurity via quantized arithmetic (<code>qmul</code>, <code>qdiv</code>, <code>qsub</code>).</p>
+
+<figure>
+<img src="../figure/demo_decision_tree.png" alt="ZK decision tree training demo: generated tree visualization with splitting nodes (green), leaf nodes (yellow), and fake nodes (blue dashed), alongside proof verification output." style="max-width:680px; width:100%;">
+<figcaption>ZK decision tree training demo. Left: the generated tree (green = split nodes, yellow = leaves, blue dashed = fake nodes). Right: Rust code and Halo2 proof output confirming the ZK proof is valid.</figcaption>
+</figure>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s11">11. Putting It All Together</h2>
+
+<p>Here is the complete pipeline from a machine learning computation to a verified proof:</p>
+
+<div class="diagram-svg">
+<svg viewBox="0 0 780 820" xmlns="http://www.w3.org/2000/svg" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#78716c"/>
+    </marker>
+    <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="grad3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#059669" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.03"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Step 0: ML Model label -->
+  <rect x="110" y="10" width="230" height="38" rx="19" fill="#7c3aed" opacity="0.12" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="225" y="35" text-anchor="middle" font-size="14" font-weight="600" fill="#7c3aed">ML Model (Python / Rust)</text>
+
+  <!-- Arrow 0→1 -->
+  <line x1="225" y1="48" x2="225" y2="75" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Step 1 -->
+  <rect x="30" y="80" width="390" height="72" rx="10" fill="url(#grad1)" stroke="#7c3aed" stroke-width="1.5"/>
+  <circle cx="56" cy="100" r="14" fill="#7c3aed" opacity="0.15"/>
+  <text x="56" y="105" text-anchor="middle" font-size="13" font-weight="700" fill="#7c3aed">1</text>
+  <text x="78" y="104" font-size="13.5" font-weight="600" fill="currentColor">Quantize into F<tspan font-size="10" dy="3">p</tspan></text>
+  <text x="78" y="126" font-size="11.5" fill="#78716c">x<tspan font-size="9" dy="2">q</tspan><tspan dy="-2"> = round( x </tspan><tspan font-size="12">&middot;</tspan> 2<tspan font-size="9" dy="-4">P</tspan><tspan dy="4"> )</tspan></text>
+  <!-- Annotation -->
+  <text x="440" y="104" font-size="11" fill="#a8a29e" font-style="italic">Real &rarr; field element</text>
+  <text x="440" y="122" font-size="11" fill="#a8a29e" font-style="italic">Negative via modular wrap</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="225" y1="152" x2="225" y2="175" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Step 2 -->
+  <rect x="30" y="180" width="390" height="90" rx="10" fill="url(#grad1)" stroke="#7c3aed" stroke-width="1.5"/>
+  <circle cx="56" cy="200" r="14" fill="#7c3aed" opacity="0.15"/>
+  <text x="56" y="205" text-anchor="middle" font-size="13" font-weight="700" fill="#7c3aed">2</text>
+  <text x="78" y="204" font-size="13.5" font-weight="600" fill="currentColor">Build PLONKish Execution Trace</text>
+  <text x="78" y="226" font-size="11.5" fill="#78716c">Advice cols: weights, inputs, intermediates</text>
+  <text x="78" y="244" font-size="11.5" fill="#78716c">Fixed cols: Remez polynomial coefficients</text>
+  <text x="78" y="262" font-size="11.5" fill="#78716c">Selectors: activate gates per row</text>
+  <!-- Annotation -->
+  <text x="440" y="210" font-size="11" fill="#a8a29e" font-style="italic">n rows &times; m columns table</text>
+  <text x="440" y="228" font-size="11" fill="#a8a29e" font-style="italic">n &le; 2<tspan font-size="8" dy="-4">k</tspan><tspan dy="4"> (k=18 &rarr; 262K rows)</tspan></text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="225" y1="270" x2="225" y2="295" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Step 3 -->
+  <rect x="30" y="300" width="390" height="90" rx="10" fill="url(#grad2)" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="56" cy="320" r="14" fill="#2563eb" opacity="0.15"/>
+  <text x="56" y="325" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb">3</text>
+  <text x="78" y="324" font-size="13.5" font-weight="600" fill="currentColor">Constraint System</text>
+  <text x="78" y="346" font-size="11.5" fill="#78716c">Gate constraints: q<tspan font-size="9" dy="2">M</tspan><tspan dy="-2"> &middot; a &middot; b + q</tspan><tspan font-size="9" dy="2">L</tspan><tspan dy="-2"> &middot; a + &hellip; = 0</tspan></text>
+  <text x="78" y="364" font-size="11.5" fill="#78716c">Lookups: range check via table {0 .. 2<tspan font-size="8" dy="-3">15</tspan><tspan dy="3">}</tspan></text>
+  <text x="78" y="382" font-size="11.5" fill="#78716c">Horner chain for polynomial approximation</text>
+  <!-- Annotation -->
+  <text x="440" y="330" font-size="11" fill="#a8a29e" font-style="italic">Custom gates + lookups</text>
+  <text x="440" y="348" font-size="11" fill="#a8a29e" font-style="italic">qmul: a&middot;b = c&middot;2<tspan font-size="8" dy="-3">P</tspan><tspan dy="3"> + r</tspan></text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="225" y1="390" x2="225" y2="415" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Step 4 -->
+  <rect x="30" y="420" width="390" height="82" rx="10" fill="url(#grad2)" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="56" cy="440" r="14" fill="#2563eb" opacity="0.15"/>
+  <text x="56" y="445" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb">4</text>
+  <text x="78" y="444" font-size="13.5" font-weight="600" fill="currentColor">Polynomial Interpolation</text>
+  <text x="78" y="466" font-size="11.5" fill="#78716c">Columns &rarr; polynomials over roots of unity</text>
+  <text x="78" y="484" font-size="11.5" fill="#78716c">&Sigma; &alpha;<tspan font-size="9" dy="-3">j</tspan><tspan dy="3"> g</tspan><tspan font-size="9" dy="2">j</tspan><tspan dy="-2">(X) = t(X) &middot; Z</tspan><tspan font-size="9" dy="2">H</tspan><tspan dy="-2">(X)  where Z</tspan><tspan font-size="9" dy="2">H</tspan><tspan dy="-2"> = X<tspan font-size="9" dy="-3">n</tspan><tspan dy="3"> &minus; 1</tspan></tspan></text>
+  <!-- Annotation -->
+  <text x="440" y="450" font-size="11" fill="#a8a29e" font-style="italic">a(&omega;<tspan font-size="8" dy="-3">i</tspan><tspan dy="3">) = a</tspan><tspan font-size="9" dy="2">i</tspan><tspan dy="-2"> for each row i</tspan></text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="225" y1="502" x2="225" y2="527" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Step 5 -->
+  <rect x="30" y="532" width="390" height="82" rx="10" fill="url(#grad2)" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="56" cy="552" r="14" fill="#2563eb" opacity="0.15"/>
+  <text x="56" y="557" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb">5</text>
+  <text x="78" y="556" font-size="13.5" font-weight="600" fill="currentColor">KZG Commit &amp; Prove</text>
+  <text x="78" y="578" font-size="11.5" fill="#78716c">Commit: C = [f(&tau;)] G<tspan font-size="9" dy="2">1</tspan><tspan dy="-2"> (BN254 curve)</tspan></text>
+  <text x="78" y="596" font-size="11.5" fill="#78716c">Multi-open via SHPLONK &rarr; batched pairing</text>
+  <!-- Annotation -->
+  <text x="440" y="562" font-size="11" fill="#a8a29e" font-style="italic">Prover time: seconds</text>
+  <text x="440" y="580" font-size="11" fill="#a8a29e" font-style="italic">Proof: ~few KB</text>
+
+  <!-- Arrow 5→6 -->
+  <line x1="225" y1="614" x2="225" y2="639" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Step 6 -->
+  <rect x="30" y="644" width="390" height="82" rx="10" fill="url(#grad3)" stroke="#059669" stroke-width="1.5"/>
+  <circle cx="56" cy="664" r="14" fill="#059669" opacity="0.15"/>
+  <text x="56" y="669" text-anchor="middle" font-size="13" font-weight="700" fill="#059669">6</text>
+  <text x="78" y="668" font-size="13.5" font-weight="700" fill="#059669">Verify (Succinct!)</text>
+  <text x="78" y="690" font-size="11.5" fill="#78716c">Pairing check:</text>
+  <text x="78" y="708" font-size="11.5" fill="#78716c">e(&pi;, [&tau;&minus;z]G<tspan font-size="9" dy="2">2</tspan><tspan dy="-2">) = e(C &minus; [v]G</tspan><tspan font-size="9" dy="2">1</tspan><tspan dy="-2">, G</tspan><tspan font-size="9" dy="2">2</tspan><tspan dy="-2">)</tspan></text>
+  <!-- Annotation -->
+  <text x="440" y="672" font-size="11" fill="#a8a29e" font-style="italic">Verifier time: milliseconds</text>
+  <text x="440" y="690" font-size="11" fill="#a8a29e" font-style="italic">O(1) group elements checked</text>
+
+  <!-- Bracket labels on the right: Prover / Verifier -->
+  <line x1="430" y1="86" x2="430" y2="608" stroke="#7c3aed" stroke-width="1" stroke-dasharray="4,3" opacity="0.4"/>
+  <line x1="430" y1="650" x2="430" y2="720" stroke="#059669" stroke-width="1" stroke-dasharray="4,3" opacity="0.4"/>
+
+  <!-- Legend -->
+  <rect x="30" y="760" width="390" height="48" rx="8" fill="none" stroke="var(--border)" stroke-width="1"/>
+  <rect x="50" y="774" width="14" height="14" rx="3" fill="#7c3aed" opacity="0.15" stroke="#7c3aed" stroke-width="1"/>
+  <text x="72" y="786" font-size="11" fill="#78716c">Prover-side computation</text>
+  <rect x="240" y="774" width="14" height="14" rx="3" fill="#059669" opacity="0.15" stroke="#059669" stroke-width="1"/>
+  <text x="262" y="786" font-size="11" fill="#78716c">Verifier-side (succinct)</text>
+</svg>
+</div>
+
+<h3 id="s11-1">11.1 What the Proof Guarantees</h3>
+
+<p>A valid proof convinces the verifier that:</p>
+<ol>
+  <li><strong>Correctness:</strong> The prover executed the ML computation faithfully (every gate constraint is satisfied).</li>
+  <li><strong>Completeness:</strong> An honest prover can always produce a valid proof.</li>
+  <li><strong>Soundness:</strong> A cheating prover cannot produce a valid proof for an incorrect computation (except with negligible probability $\leq 2^{-128}$).</li>
+  <li><strong>Zero-Knowledge:</strong> The proof reveals nothing about the private inputs (model weights, training data) beyond what is implied by the public outputs.</li>
+</ol>
+
+<h3 id="s11-2">11.2 Concrete Costs</h3>
+
+<p>Each fixed-point operation translates to a known number of table rows:</p>
+
+<table>
+<thead><tr><th>Operation</th><th>Approx. Rows</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>qadd</code> / <code>qsub</code></td><td>1</td><td>Single gate</td></tr>
+<tr><td><code>qmul</code></td><td>~10</td><td>1 mul + div_mod + range decomposition</td></tr>
+<tr><td><code>qdiv</code></td><td>~20</td><td>Pre-scale + div_mod_var + sign handling</td></tr>
+<tr><td><code>qexp2</code></td><td>~200</td><td>Range reduction + degree-12 Horner + conditional</td></tr>
+<tr><td><code>qlog2</code></td><td>~250</td><td>Normalization + degree-14 Horner + shift</td></tr>
+<tr><td><code>qsin</code></td><td>~300</td><td>Mod reduction + two degree-14 Horner + sign</td></tr>
+<tr><td>sigmoid $\sigma(x)$</td><td>~250</td><td><code>qexp</code> + <code>qdiv</code></td></tr>
+</tbody>
+</table>
+
+<p>With $k = 18$, the circuit supports up to $2^{18} = 262{,}144$ rows&mdash;enough for inference on small-to-medium models and training on small datasets.</p>
+
+<hr>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="s12">12. References</h2>
+
+<ol>
+  <li>Groth, J. (2016). <em>On the Size of Pairing-Based Non-interactive Arguments.</em> EUROCRYPT 2016.</li>
+  <li>Gabizon, A., Williamson, Z., &amp; Ciobotaru, O. (2019). <em>PLONK: Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge.</em> IACR ePrint 2019/953.</li>
+  <li>Kate, A., Zaverucha, G., &amp; Goldberg, I. (2010). <em>Constant-Size Commitments to Polynomials and Their Applications.</em> ASIACRYPT 2010.</li>
+  <li>Bowe, S., Grigg, J., &amp; Hopwood, D. (2019). <em>Recursive Proof Composition without a Trusted Setup.</em> (Halo paper.)</li>
+  <li>The Halo2 Book. <a href="https://zcash.github.io/halo2/">https://zcash.github.io/halo2/</a></li>
+  <li>Axiom. <em>halo2-lib documentation.</em> <a href="https://docs.axiom.xyz/protocol/zero-knowledge-proofs/getting-started-with-halo2">https://docs.axiom.xyz</a></li>
+  <li>Barreto, P. &amp; Naehrig, M. (2005). <em>Pairing-Friendly Elliptic Curves of Prime Order.</em> (BN curves.)</li>
+  <li>Remez, E. (1934). <em>Sur la d&eacute;termination des polyn&ocirc;mes d'approximation de degr&eacute; donn&eacute;e.</em> Comm. Soc. Math. Kharkov.</li>
+</ol>
+
+<footer>
+  <p>ZKFixedPointChip &mdash; ZK Fixed Point Arithmetic for Machine Learning &mdash; Built on <a href="https://github.com/privacy-scaling-explorations/halo2">Halo2</a> &amp; <a href="https://github.com/axiom-crypto/halo2-lib">Axiom halo2-base</a>.</p>
+  <p>Source: <a href="https://github.com/DCMMC/ZKFixedPointChip">github.com/DCMMC/ZKFixedPointChip</a></p>
+</footer>
+
+</main><!-- end .content -->
+
+<script>
+// --- Theme Toggle ---
+function getSystemTheme() {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || getSystemTheme();
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  localStorage.setItem('theme', next);
+}
+// On load: restore saved theme or follow system
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved) {
+    applyTheme(saved);
+  }
+  // Listen for system theme changes when no explicit preference
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+    if (!localStorage.getItem('theme')) {
+      // no explicit override, system change is auto via CSS
+    }
+  });
+})();
+
+// --- Sidebar mobile toggle ---
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// --- Active section tracking ---
+(function() {
+  var sections = document.querySelectorAll('h2[id], h3[id]');
+  var links = document.querySelectorAll('nav.sidebar a');
+  if (!sections.length || !links.length) return;
+
+  function setActive(id) {
+    links.forEach(function(a) { a.classList.remove('active'); });
+    var active = document.querySelector('nav.sidebar a[href="#' + id + '"]');
+    if (active) {
+      active.classList.add('active');
+      // expand parent <li> if this is a subsection
+      var parentLi = active.closest('ol').closest('li');
+      if (parentLi) parentLi.classList.add('expanded');
+    }
+    // collapse sections that have no active child
+    document.querySelectorAll('nav.sidebar > ol > li').forEach(function(li) {
+      if (!li.querySelector('a.active')) li.classList.remove('expanded');
+    });
+  }
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        setActive(entry.target.getAttribute('id'));
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px' });
+
+  sections.forEach(function(s) { observer.observe(s); });
+
+  // also expand on click
+  document.querySelectorAll('nav.sidebar > ol > li > a').forEach(function(a) {
+    a.addEventListener('click', function() {
+      var li = a.parentElement;
+      li.classList.toggle('expanded');
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
