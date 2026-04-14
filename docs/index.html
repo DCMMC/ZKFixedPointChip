@@ -603,6 +603,7 @@ ol.reference-list li:last-child { border-bottom: none; }
         <li><a href="#s8-1" onclick="closeSidebar()">8.1 Quantization Scheme</a></li>
         <li><a href="#s8-2" onclick="closeSidebar()">8.2 Negative Numbers</a></li>
         <li><a href="#s8-3" onclick="closeSidebar()">8.3 Arithmetic Operations</a></li>
+        <li><a href="#s8-4" onclick="closeSidebar()">8.4 Precision and Error Analysis</a></li>
       </ol>
     </li>
     <li><a href="#s9" onclick="closeSidebar()">9. Polynomial Approximation</a>
@@ -610,6 +611,8 @@ ol.reference-list li:last-child { border-bottom: none; }
         <li><a href="#s9-1" onclick="closeSidebar()">9.1 Remez Algorithm</a></li>
         <li><a href="#s9-2" onclick="closeSidebar()">9.2 Horner's Method</a></li>
         <li><a href="#s9-3" onclick="closeSidebar()">9.3 Range Reduction</a></li>
+        <li><a href="#s9-4" onclick="closeSidebar()">9.4 Circuit Gadgets</a></li>
+        <li><a href="#s9-5" onclick="closeSidebar()">9.5 Function Reference</a></li>
       </ol>
     </li>
     <li><a href="#s10" onclick="closeSidebar()">10. ZK ML Circuits</a>
@@ -623,6 +626,7 @@ ol.reference-list li:last-child { border-bottom: none; }
       <ol>
         <li><a href="#s11-1" onclick="closeSidebar()">11.1 Proof Guarantees</a></li>
         <li><a href="#s11-2" onclick="closeSidebar()">11.2 Concrete Costs</a></li>
+        <li><a href="#s11-3" onclick="closeSidebar()">11.3 Limitations &amp; Future Work</a></li>
       </ol>
     </li>
     <li><a href="#s12" onclick="closeSidebar()">12. References</a></li>
@@ -1669,60 +1673,113 @@ $$\hat{x} = x_q / 2^P.$$
 The scaling factor $S = 2^P$ is called the <strong>quantization scale</strong>.
 </div>
 
-<p>This project supports $P \in [32, 63]$. With $P = 32$, we get a "32.32" format: 32 bits for the integer part and 32 bits for the fractional part, giving roughly 9 decimal digits of precision.</p>
+<p>This project supports $P \in [32, 63]$. With $P = 32$, we get a "32.32" format: 32 bits for the integer part and 32 bits for the fractional part, giving roughly 9 decimal digits of precision. The upper bound $P \leq 63$ is imposed by the BN254 field size: intermediate products $x_q \cdot y_q$ reach $2^{2P}$, which must stay below $p \approx 2^{254}$, so $2P \ll 254$, giving $P \leq 63$ with margin.</p>
 
 <div class="example-box">
 <span class="label">Example ($P = 32$)</span>
 $\pi \approx 3.14159265$:
-$$\pi_q = \lfloor 3.14159265 \times 2^{32} \rceil = \lfloor 3.14159265 \times 4294967296 \rceil = 13493037705.$$
-De-quantization: $13493037705 / 4294967296 \approx 3.14159265$.
+$$\pi_q = \lfloor 3.14159265 \times 2^{32} \rceil = \lfloor 3.14159265 \times 4294967296 \rceil = 13{,}493{,}037{,}705.$$
+De-quantization: $13{,}493{,}037{,}705 / 4{,}294{,}967{,}296 \approx 3.14159265$.
+</div>
+
+<div class="info-box">
+<strong>Quantization error.</strong> Rounding $x \cdot 2^P$ to the nearest integer introduces an error of at most $\frac{1}{2}$ in the last bit:
+$$|x - \hat{x}| = \frac{|x_q - x \cdot 2^P|}{2^P} \leq \frac{1}{2^{P+1}}.$$
+With $P = 32$ this is $\approx 2.3 \times 10^{-10}$; with $P = 63$ it is $\approx 5.4 \times 10^{-20}$. The choice of $P$ trades range against precision: larger $P$ gives finer resolution but shrinks the safe integer range from $(-2^{2P}, 2^{2P})$ toward the field boundary.
 </div>
 
 <h3 id="s8-2">8.2 Handling Negative Numbers</h3>
 
-<p>Since $\mathbb{F}_p$ contains only elements $\{0, 1, \dots, p-1\}$, negative numbers use <strong>modular wraparound</strong>:</p>
-$$\text{Encode}(-x) = p - x_q + 1 \equiv -x_q \pmod{p}.$$
+<p>Since $\mathbb{F}_p$ contains only elements $\{0, 1, \dots, p-1\}$, negative numbers use <strong>modular wraparound</strong> — exactly like two's complement, but modulo $p$ instead of $2^{64}$:</p>
+$$\text{Encode}(-x) = p - x_q \equiv -x_q \pmod{p}.$$
+
+<div class="example-box">
+<span class="label">Example — Encoding $-\pi$ ($P = 32$)</span>
+$\pi_q = 13{,}493{,}037{,}705$. The BN254 prime is $p = 21888242871839275222246405745257275088548364400416034343698204186575808495617$. So:
+$$(-\pi)_q = p - 13{,}493{,}037{,}705 = 21888242871839275222246405745257275088548364400416034343684711148870123457912.$$
+This large number, when subtracted from $p$ in the field, recovers $\pi_q$.
+</div>
 
 <figure>
 <img src="../figure/quantization.png" alt="Quantization scheme and BN254 number line showing positive numbers in the lower range and negative numbers wrapping around from M." style="max-width:380px; width:100%;">
-<figcaption>Symmetric quantization with the BN254 number line. Positive values occupy $[0, 2^p - 1]$; negative values wrap around from $M$ (the field modulus), occupying $[M - 2^p, M]$.</figcaption>
+<figcaption>Symmetric quantization with the BN254 number line. Positive values occupy $[0, 2^{2P}-1]$; negative values wrap around from the top of the field, occupying $[p - 2^{2P}, p-1]$. The gap in the middle is unused.</figcaption>
 </figure>
 
 <p>The chip defines a <strong>negative threshold</strong>:</p>
 $$\text{negative\_point} = p - 2^{2P+1} + 1.$$
-<p>Any value $v > \text{negative\_point}$ is interpreted as negative. The valid range is $(-2^{2P},\; 2^{2P})$.</p>
+<p>Any value $v > \text{negative\_point}$ is interpreted as negative, and its real value is $-(p - v)/2^P$. The valid range is $(-2^{2P},\; 2^{2P})$.</p>
+
+<p><strong>Sign check in circuit.</strong> To determine the sign of a value $v$ without branching, the chip uses a range-chip comparison against the fixed constant <code>negative_point</code>: it decomposes $v - \text{negative\_point}$ into bits via lookup arguments (the same mechanism as <code>is_less_than</code> in §9.4.3) and reads off whether the result is positive or negative. This produces a binary <em>sign bit</em> $s \in \{0,1\}$ usable in subsequent gate constraints.</p>
 
 <h3 id="s8-3">8.3 Arithmetic Operations</h3>
 
 <h4>Addition and Subtraction</h4>
 <p>These work directly in $\mathbb{F}_p$ because quantization is linear:</p>
 $$x_q + y_q = (x + y)_q, \qquad x_q - y_q = (x - y)_q.$$
+<p>No rescaling is needed. The only risk is overflow: if $|x| + |y| \geq 2^{2P}$ the result wraps around the field and is misinterpreted. The valid range $(-2^{2P}, 2^{2P})$ must be respected by the caller.</p>
 
 <h4>Multiplication</h4>
-<p>Multiplying two quantized values gives a double-scaled result:</p>
+<p>Multiplying two quantized values gives a <em>double-scaled</em> result:</p>
 $$x_q \cdot y_q = (x \cdot 2^P)(y \cdot 2^P) = xy \cdot 2^{2P}.$$
-<p>We must <strong>rescale</strong> by dividing by $2^P$:</p>
-$$\text{qmul}(x_q, y_q) = \frac{x_q \cdot y_q}{2^P} = xy \cdot 2^P = (xy)_q.$$
-<p>In the circuit, this division is implemented via the range chip's <code>div_mod</code> operation with a range check to ensure correctness.</p>
+<p>We must <strong>rescale</strong> by dividing by $2^P$ and discarding the remainder $r$:</p>
+$$x_q \cdot y_q = (xy)_q \cdot 2^P + r, \qquad 0 \leq r < 2^P.$$
+$$\text{qmul}(x_q, y_q) = (xy)_q = \frac{x_q \cdot y_q - r}{2^P}.$$
+
+<p><strong>Circuit structure for <code>qmul</code>:</strong></p>
+<ol>
+  <li>Compute the raw product $N = |x_q| \cdot |y_q|$ using a single FlexGate multiply cell.</li>
+  <li>Call <code>div_mod(N, 2^P)</code>: the range chip finds quotient $q$ and remainder $r$ such that $N = q \cdot 2^P + r$, and enforces $0 \leq r < 2^P$ by decomposing $r$ into $P/15$ lookup chunks of 15 bits each.</li>
+  <li>Determine the output sign: $\text{sign}(xy) = \text{sign}(x) \oplus \text{sign}(y)$. Extract each sign bit via the §8.2 sign-check gadget, XOR them (one gate), and conditionally negate $q$ if the result is negative.</li>
+  <li>Enforce consistency: a gate constraint checks $|x_q| \cdot |y_q| = q \cdot 2^P + r$, binding the witness.</li>
+</ol>
+<p>The truncation of $r$ introduces a rounding error of at most $1/2^P$ per multiplication (see §8.4).</p>
 
 <h4>Division</h4>
-<p>Division requires pre-scaling to maintain precision:</p>
+<p>Division requires pre-scaling the numerator to maintain precision after the integer divide:</p>
 $$\text{qdiv}(x_q, y_q) = \frac{x_q \cdot 2^P}{y_q} = \frac{x \cdot 2^{2P}}{y \cdot 2^P} = \frac{x}{y} \cdot 2^P = (x/y)_q.$$
 
-<p>For signed division, the chip extracts signs, operates on absolute values, then restores the sign via XOR of the sign bits:</p>
-$$\text{sign}(x/y) = \text{sign}(x) \oplus \text{sign}(y).$$
+<p><strong>Circuit structure for <code>qdiv</code>:</strong></p>
+<ol>
+  <li>Pre-scale: compute $N = |x_q| \cdot 2^P$ (a bit-shift, implemented as a multiply-by-constant gate — 1 row).</li>
+  <li>Call <code>div_mod_var(N, |y_q|)</code>: finds quotient $q$ and remainder $r$ with $N = q \cdot |y_q| + r$ and $0 \leq r < |y_q|$. The remainder bound is enforced by a variable-modulus range check (more expensive than fixed-modulus, ~15 rows).</li>
+  <li>Restore sign: $\text{sign}(x/y) = \text{sign}(x) \oplus \text{sign}(y)$, same XOR-and-negate gadget as <code>qmul</code>.</li>
+  <li>Consistency gate: $|x_q| \cdot 2^P = q \cdot |y_q| + r$.</li>
+</ol>
 
 <h4>Summary of Rescaling</h4>
 
 <table>
-<thead><tr><th>Operation</th><th>Raw Result</th><th>Rescaling</th><th>Circuit Cost</th></tr></thead>
+<thead><tr><th>Operation</th><th>Raw computation</th><th>Rescaling</th><th>Truncation error</th><th>Circuit rows</th></tr></thead>
 <tbody>
-<tr><td>$x + y$</td><td>$x_q + y_q$</td><td>None</td><td>1 add gate</td></tr>
-<tr><td>$x - y$</td><td>$x_q - y_q$</td><td>None</td><td>1 sub gate</td></tr>
-<tr><td>$x \times y$</td><td>$x_q y_q$</td><td>$\div 2^P$</td><td>1 mul + 1 div_mod + range check</td></tr>
-<tr><td>$x / y$</td><td>$x_q \cdot 2^P / y_q$</td><td>Pre-scale $\times 2^P$</td><td>1 mul + 1 div_mod_var + range check + sign</td></tr>
+<tr><td>$x + y$</td><td>$x_q + y_q$</td><td>None</td><td>0</td><td>1</td></tr>
+<tr><td>$x - y$</td><td>$x_q - y_q$</td><td>None</td><td>0</td><td>1</td></tr>
+<tr><td>$x \times y$</td><td>$|x_q||y_q| = q\cdot 2^P + r$</td><td>Keep $q$, drop $r$</td><td>$\leq 2^{-P}$</td><td>~10</td></tr>
+<tr><td>$x / y$</td><td>$|x_q| \cdot 2^P = q\cdot|y_q| + r$</td><td>Keep $q$, drop $r$</td><td>$\leq |y|^{-1} \cdot 2^{-P}$</td><td>~20</td></tr>
 </tbody>
 </table>
+
+<h3 id="s8-4">8.4 Precision and Error Analysis</h3>
+
+<p>Each arithmetic operation introduces a small <strong>truncation error</strong> from discarding the remainder. These errors accumulate as operations are chained.</p>
+
+<h4>Per-operation error</h4>
+<p>Let $\tilde{z}$ denote the computed fixed-point result and $z$ the exact real value. For each operation:</p>
+<ul>
+  <li><strong>Addition/subtraction:</strong> no truncation, so $|\tilde{z} - z| = 0$ (beyond the input quantization error).</li>
+  <li><strong>Multiplication:</strong> $|\widetilde{xy} - xy| \leq 2^{-P}$, since the dropped remainder satisfies $0 \leq r < 2^P$, i.e., error $r / 2^{2P} < 2^{-P}$ in real units.</li>
+  <li><strong>Division:</strong> $|\widetilde{x/y} - x/y| \leq |y|^{-1} \cdot 2^{-P}$. Division by a small $|y|$ amplifies the error.</li>
+</ul>
+
+<h4>Error accumulation</h4>
+<p>For a chain of $k$ multiplications the errors add (they do not multiply, since each introduces an independent additive error):</p>
+$$\left|\tilde{z} - z\right| \leq k \cdot 2^{-P} + \varepsilon_{\text{input}}$$
+where $\varepsilon_{\text{input}} \leq 2^{-(P+1)}$ is the initial quantization error. For $k = 100$ multiplications at $P = 32$:
+$$\text{accumulated error} \leq 100 \times 2^{-32} \approx 2.3 \times 10^{-8}.$$
+<p>This is well within acceptable tolerance for ML inference. For training (many more multiplications and divisions), larger $P$ (e.g. $P = 63$) is recommended to prevent gradient divergence.</p>
+
+<div class="info-box">
+<strong>Why not floating point?</strong> IEEE 754 floating point uses a variable exponent to maintain relative precision across a wide dynamic range. Fixed-point uses a constant exponent $2^P$, so precision is absolute rather than relative — values near zero have the same absolute error as large values. This is a limitation for ML models with large weight variance, but the simplicity of fixed-point (only integer arithmetic, no exponent tracking) makes it far cheaper to express as ZK circuit constraints.
+</div>
 
 <!-- ════════════════════════════════════════════ -->
 <h2 id="s9">9. Polynomial Function Approximation</h2>
@@ -1786,28 +1843,394 @@ $$\log_2 x = \log_2 x' + (n - 1).$$
 <p>Finally, $\sin(-x) = -\sin(x)$ restores the sign. Cosine and tangent are derived:</p>
 $$\cos x = \sin(x + \pi/2), \qquad \tan x = \sin x / \cos x.$$
 
+<h3 id="s9-4">9.4 Circuit Gadgets for ML Primitives</h3>
+
+<p>Sections 8 and 9.1–9.3 provide the arithmetic building blocks (<code>qmul</code>, <code>qdiv</code>, Horner chains, range reduction). This section assembles them into reusable <strong>gadgets</strong> that the ML circuits in Section 10 call directly.</p>
+
+<h4 id="s9-4-1">9.4.1 <code>inner_product</code> — Dot Product</h4>
+<p>Computes $\mathbf{u} \cdot \mathbf{v} = \sum_{i=1}^d u_i v_i$ for two quantized vectors of length $d$.</p>
+<p><strong>Circuit structure:</strong></p>
+<ol>
+  <li>For each $i = 1, \dots, d$: one <code>qmul</code> gate computes $p_i = u_i \cdot v_i$ (~10 rows each).</li>
+  <li>A running accumulator adds products: $A_1 = p_1$, $A_i = A_{i-1} + p_i$ using $d-1$ <code>qadd</code> gates (1 row each).</li>
+  <li>Copy constraints wire each $p_i$ output cell to the corresponding accumulator input cell, enforcing no intermediate value is swapped.</li>
+</ol>
+<p><strong>Row count:</strong> $d \times 10 + (d-1) \approx 11d$ rows. <strong>Output:</strong> $A_d = (\mathbf{u}\cdot\mathbf{v})_q$.</p>
+
+<h4 id="s9-4-2">9.4.2 <code>sigmoid</code> — Logistic Activation</h4>
+<p>Computes $\sigma(z) = \frac{1}{1+e^{-z}}$ for a quantized scalar $z$.</p>
+<p><strong>Circuit structure</strong> (chained via copy constraints):</p>
+<ol>
+  <li><code>qneg</code>: $z' = -z$ — one subtraction gate (1 row).</li>
+  <li><code>qexp</code>: $e' = e^{z'} = 2^{z'/\ln 2}$ — range reduction splits $z' = n + f$, table lookup gives $2^n$, degree-12 Horner gives $2^f$, one <code>qmul</code> combines them (~200 rows).</li>
+  <li><code>qadd</code>: $d' = 1 + e'$ — one addition gate (1 row). The constant $1_q = 2^P$ is stored in a fixed column.</li>
+  <li><code>qdiv</code>: $\hat{y} = 1_q / d'$ — pre-scale, <code>div_mod_var</code>, sign handling (~20 rows).</li>
+</ol>
+<p><strong>Row count:</strong> ~222 rows. <strong>Output:</strong> $\hat{y}_q = \sigma(z)_q \in [0, 1]$.</p>
+
+<h4 id="s9-4-3">9.4.3 <code>is_less_than</code> — Integer Comparison</h4>
+<p>Computes the boolean $[a < b]$ for two quantized values $a, b$, returning $1_q$ if true and $0$ otherwise.</p>
+<p><strong>Circuit structure:</strong></p>
+<ol>
+  <li>Compute $\Delta = b - a$ using <code>qsub</code> (1 row). If $b > a$ then $\Delta > 0$; if $b \leq a$ then $\Delta \leq 0$ (wraps around modulo $p$).</li>
+  <li>Determine the sign of $\Delta$ by checking whether $\Delta > \text{negative\_point}$ (Section 8.2). This decomposes $\Delta$ into its constituent bits via the range chip's lookup table $\{0,\dots,2^{15}-1\}$, consuming ~13 rows.</li>
+  <li>Output a binary cell $s$: if $\Delta$ is in the positive range, $s = 1$; otherwise $s = 0$. Enforced by a gate constraint $s \cdot (s-1) = 0$.</li>
+</ol>
+<p><strong>Row count:</strong> ~15 rows. <strong>Output:</strong> $s \in \{0, 1\}$.</p>
+
+<h4 id="s9-4-4">9.4.4 <code>select</code> — Arithmetic Multiplexer</h4>
+<p>Given a binary selector $s \in \{0,1\}$ and two values $A$, $B$, computes $\text{out} = s \cdot A + (1-s) \cdot B$.</p>
+<p><strong>Circuit structure:</strong></p>
+<ol>
+  <li><code>qmul</code>: $t_1 = s \cdot A$ (~10 rows). Since $s \in \{0,1\}$, no rescaling is needed; a specialized gate skips the $\div 2^P$ step (1 row).</li>
+  <li><code>qsub</code>: $\bar{s} = 1 - s$ (1 row).</li>
+  <li><code>qmul</code>: $t_2 = \bar{s} \cdot B$ (1 row, same specialized gate).</li>
+  <li><code>qadd</code>: $\text{out} = t_1 + t_2$ (1 row).</li>
+</ol>
+<p><strong>Row count:</strong> ~4 rows. <strong>Output:</strong> $A$ if $s=1$, else $B$. Used in decision tree branching to select the next node index without revealing which branch was taken.</p>
+
+<h3 id="s9-5">9.5 Complete Function Reference</h3>
+
+<p>This section walks through every function in <code>FixedPointChip</code>, explaining the algorithm, circuit structure, and cost. Notation: $S = 2^P$ is the quantization scale, subscript $q$ denotes a quantized field element, and all operations below live in $\mathbb{F}_p$ with $p$ the BN254 prime.</p>
+
+<h4 id="s9-5-1">9.5.1 Basic Arithmetic</h4>
+
+<p><strong><code>qadd(a, b)</code></strong> &mdash; $\hat{a} + \hat{b}$</p>
+<p>Delegates directly to the PLONKish addition gate: $\text{out} = a + b \pmod{p}$. No rescaling needed because both operands share the same scale $S$: $a_q + b_q = (a+b) \cdot S$. <em>Cost: 1 row.</em></p>
+
+<p><strong><code>qsub(a, b)</code></strong> &mdash; $\hat{a} - \hat{b}$</p>
+<p>Delegates to the subtraction gate: $\text{out} = a - b \pmod{p}$. Negative results wrap around modulo $p$ and are interpreted via the negative-point convention (§8.2). <em>Cost: 1 row.</em></p>
+
+<p><strong><code>qmul(a, b)</code></strong> &mdash; $\hat{a} \cdot \hat{b}$</p>
+<p>Multiplying two scaled values produces $a_q \cdot b_q = (ab) \cdot S^2$, which is one factor of $S$ too large. The implementation:</p>
+<ol>
+  <li>Compute raw product $P = a \cdot b$ via a multiplication gate.</li>
+  <li>Call <code>signed_div_scale</code> (see §9.5.2) to compute $\lfloor P / S \rfloor$ with correct sign handling, yielding $\text{out}_q = (ab) \cdot S$.</li>
+</ol>
+<p><em>Cost: ~12 rows (1 mul + ~11 for signed_div_scale).</em></p>
+
+<p><strong><code>qdiv(a, b)</code></strong> &mdash; $\hat{a} / \hat{b}$</p>
+<p>Division must restore the scale: $(a_q / b_q) \cdot S = (a/b) \cdot S$. Steps:</p>
+<ol>
+  <li>Extract signs via <code>is_neg</code>; compute absolute values $|a|$, $|b|$.</li>
+  <li>Pre-multiply: $a' = |a| \cdot S$ (this makes $a' / |b|$ land at the right scale).</li>
+  <li>Compute the unsigned quotient $q = \lfloor a' / |b| \rfloor$ via <code>div_mod_var</code> (range chip).</li>
+  <li>Restore sign: $\text{out} = q$ if $\text{sign}(a) = \text{sign}(b)$, else $-q$, using <code>bit_xor</code> + <code>cond_neg</code>.</li>
+</ol>
+<p><em>Cost: ~20 rows.</em></p>
+
+<p><strong><code>qmod(a, b)</code></strong> &mdash; $\hat{a} \bmod \hat{b}$</p>
+<p>Computes the fixed-point remainder. Constraint: $b$ must be positive. Steps:</p>
+<ol>
+  <li>Assert $b > 0$ (check that <code>is_neg(b)</code> $= 0$).</li>
+  <li>Compute $|a|$ and call <code>div_mod_var</code> to get remainder $r = |a| \bmod b$.</li>
+  <li>If $a < 0$: return $b - r$ (so the result is in $[0, b)$ regardless of sign). Uses a <code>select</code> gate on the sign bit.</li>
+</ol>
+<p><em>Cost: ~15 rows.</em></p>
+
+<p><strong><code>qsum(a[])</code></strong> &mdash; $\sum_i \hat{a}_i$</p>
+<p>Delegates to the gate's <code>sum</code> helper, which chains addition gates over the input array. <em>Cost: $n-1$ rows for $n$ inputs.</em></p>
+
+<p><strong><code>inner_product(a[], b[])</code></strong> &mdash; $\mathbf{a} \cdot \mathbf{b}$</p>
+<p>For vectors of length $d$: calls <code>qmul(a[i], b[i])</code> for each $i$, then accumulates with <code>qadd</code>. <em>Cost: $\approx 11d$ rows (§9.4.1).</em></p>
+
+<h4 id="s9-5-2">9.5.2 Sign, Absolute Value, and Clipping</h4>
+
+<p><strong><code>is_neg(a)</code></strong> &mdash; returns $1$ if $a < 0$, else $0$</p>
+<p>In BN254 fixed-point, a negative number satisfies $a > \text{negative\_point} = p - 2^{2P+1}$. The circuit:</p>
+<ol>
+  <li>Right-shift $a$ by $2P+1$ bits using <code>div_mod</code> with divisor $2^{2P+1}$, yielding the high bits $h$.</li>
+  <li>If $h = 0$, the number is non-negative; if $h \neq 0$, it is negative.</li>
+  <li>Return $\texttt{not}(\texttt{is\_zero}(h))$.</li>
+</ol>
+<p><em>Cost: ~13 rows (range decomposition).</em></p>
+
+<p><strong><code>sign(a)</code></strong> &mdash; returns $+1_q$ or $-1_q$</p>
+<p>Calls <code>is_neg(a)</code> to get a binary flag, then uses a <code>select</code> gate to output the quantized constant $1_q = S$ or $-1_q = p - S$. <em>Cost: ~15 rows.</em></p>
+
+<p><strong><code>cond_neg(a, is_neg)</code></strong> &mdash; returns $-a$ if <code>is_neg</code> $= 1$, else $a$</p>
+<p>Computes $-a \pmod p$ unconditionally, then selects between $-a$ and $a$ using the <code>select</code> gate on the precomputed <code>is_neg</code> bit. <em>Cost: 2 rows.</em></p>
+
+<p><strong><code>qabs(a)</code></strong> &mdash; $|\hat{a}|$</p>
+<p>Computes <code>is_neg(a)</code>, negates $a$ unconditionally to get $a'$, then selects: $\text{out} = a'$ if negative, else $a$. <em>Cost: ~15 rows.</em></p>
+
+<p><strong><code>clip(a)</code></strong> &mdash; overflow clamping to $(-2^{2P}, 2^{2P})$</p>
+<p>After operations that may overflow the valid range (e.g., intermediate sums), <code>clip</code> reduces the result modulo $2^{2P}$:</p>
+<ol>
+  <li>Extract sign, compute $|a|$.</li>
+  <li>Compute $|a| \bmod 2^{2P}$ via <code>div_mod</code>.</li>
+  <li>Restore sign via <code>cond_neg</code>.</li>
+</ol>
+<p><em>Warning: assumes $|a| < 2^{2P+1}$; silent overflow if the input is too large. Cost: ~20 rows.</em></p>
+
+<p><strong><code>bit_xor(a, b)</code></strong> &mdash; bitwise XOR for single bits</p>
+<p>Asserts $a, b \in \{0,1\}$, computes $a + b$, and checks equality with $1$ via <code>is_equal</code>. The identity $a \oplus b = [a + b = 1]$ holds for bits. <em>Cost: ~5 rows.</em></p>
+
+<p><strong><code>qmax(a, b)</code></strong> &mdash; $\max(\hat{a}, \hat{b})$</p>
+<p>Computes $\Delta = a - b$; calls <code>is_neg</code> on $\Delta$ to get a bit $s$. Uses <code>select</code>: return $b$ if $s=1$ (meaning $a < b$), else $a$. <em>Cost: ~18 rows.</em></p>
+
+<p><strong><code>qmin(a, b)</code></strong> &mdash; $\min(\hat{a}, \hat{b})$</p>
+<p>Same as <code>qmax</code> but swaps the two outputs of <code>select</code>: return $a$ if $s=1$, else $b$. <em>Cost: ~18 rows.</em></p>
+
+<p><strong><code>signed_div_scale(a)</code> (internal helper)</strong></p>
+<p>Computes $(q, r)$ such that $a = q \cdot S + r$, $r \in [0, S)$, handling both positive and negative $a$ correctly in $\mathbb{F}_p$:</p>
+<ol>
+  <li>Detect sign by comparing $\text{fe\_to\_biguint}(a)$ against $2^{252}$ (off-circuit hint).</li>
+  <li>For negative $a$: compute $a_{\text{abs}} = p - a + 1$, then ceiling-divide: $q = \lceil a_{\text{abs}} / S \rceil$ taken modulo $p$ to represent $-\lceil a_{\text{abs}} / S \rceil$.</li>
+  <li>For positive $a$: standard floor division.</li>
+  <li>Assign the decomposition $[r, S, q, a]$ into a constraint region enforcing $r + S \cdot q = a$ via a single multiplication gate row.</li>
+  <li>Range-check $r \in [0, S)$ and $|q| < 2^{3P}$.</li>
+</ol>
+<p><em>Cost: ~11 rows.</em></p>
+
+<p><strong><code>check_power_of_two(pow2_exponent, exponent)</code> (internal helper)</strong></p>
+<p>Proves in-circuit that <code>pow2_exponent</code> $= 2^{\texttt{exponent}}$:</p>
+<ol>
+  <li>Decompose <code>pow2_exponent</code> into its $2P$ bits.</li>
+  <li>Assert the sum of bits equals 1 (exactly one bit set).</li>
+  <li>Use <code>select_from_idx</code> to extract the bit at position <code>exponent</code> and assert it is 1.</li>
+</ol>
+<p><em>Cost: ~$2P$ rows.</em></p>
+
+<h4 id="s9-5-3">9.5.3 Exponential and Logarithm</h4>
+
+<p><strong><code>qexp2(a)</code></strong> &mdash; $2^{\hat{a}}$</p>
+<p>Uses the range reduction $2^a = 2^n \cdot 2^f$ where $n = \lfloor a \rfloor$ and $f \in [0, 1)$.</p>
+<ol>
+  <li><strong>Split:</strong> <code>div_mod(|a|, S)</code> gives integer part $n$ (= <code>int_part</code>) and fractional part $f \cdot S$ (= <code>frac_part</code>).</li>
+  <li><strong>Table lookup:</strong> select $2^n$ from the precomputed <code>pow_of_two</code> array (length $254$) using <code>select_from_idx(n)</code>. This witnesses the value without constraint; <code>check_power_of_two</code> is <em>not</em> called here since the table is fixed at setup time.</li>
+  <li><strong>Polynomial:</strong> evaluate the degree-12 Remez polynomial for $2^f$ on <code>frac_part</code> (§9.1).</li>
+  <li><strong>Combine:</strong> $\text{res\_pos} = 2^n \cdot 2^f$ via <code>mul</code>. Note: both $2^n$ and $2^f_q$ are fixed-point, so their raw product is at scale $S^2$; however $2^n$ here is the raw integer (not quantized), so the product is already at scale $S$.</li>
+  <li><strong>Negative input:</strong> if $a < 0$, output $1 / \text{res\_pos}$ via <code>qdiv</code>; otherwise output <code>res_pos</code>. Selected by <code>is_neg(a)</code>.</li>
+</ol>
+<p><em>Cost: ~240 rows (split ~13, table select $O(2P)$, Horner 12×qmul+qadd, qdiv ~20).</em></p>
+
+<p><strong><code>qexp(a)</code></strong> &mdash; $e^{\hat{a}}$</p>
+<p>Uses the identity $e^x = 2^{x / \ln 2}$:</p>
+<ol>
+  <li>Load constant $\ln 2 \approx 0.6931\ldots$ (quantized).</li>
+  <li>Compute $x' = x / \ln 2$ via <code>qdiv</code>.</li>
+  <li>Return <code>qexp2(x')</code>.</li>
+</ol>
+<p><em>Cost: ~260 rows.</em></p>
+
+<p><strong><code>qlog2(a)</code></strong> &mdash; $\log_2 \hat{a}$ &nbsp; <small>(inspired by <a href="https://rust-lang.github.io/packed_simd/src/libm/math/log.rs.html" target="_blank" rel="noopener">libm <code>log.rs</code></a>)</small></p>
+<p>Mirrors the classical libm approach: find the integer part of the exponent by locating the most-significant bit, normalize to a canonical interval, then apply a polynomial approximation.</p>
+<ol>
+  <li><strong>Domain check:</strong> assert $a > 0$ — check <code>is_neg(a)</code> $= 0$ and <code>is_zero(a)</code> $= 0$; combine with <code>or</code> and assert constant $0$.</li>
+  <li><strong>MSB detection (off-circuit hint):</strong> scan the little-endian bit representation of $a$'s value to find the index of the highest set bit. Call this $\texttt{num\_digits}$. Then $2^{\texttt{num\_digits}} \leq a < 2^{\texttt{num\_digits}+1}$, so set $n = \texttt{num\_digits}$ and $\texttt{exp2} = n + 1$.</li>
+  <li><strong>In-circuit verification of the hint:</strong>
+    <ol type="a">
+      <li>Witness $\texttt{pow1} = 2^n$ and $\texttt{pow2} = 2^{n+1}$; load as <code>Witness</code> cells.</li>
+      <li>Call <code>check_power_of_two(pow1, n)</code> and <code>check_power_of_two(pow2, n+1)</code> to prove the witnesses are correct powers of two.</li>
+      <li>Use range comparisons to assert $\texttt{pow1} \leq a < \texttt{pow2}$ (two <code>is_less_than</code> + <code>is_equal</code> + <code>and</code>/<code>or</code> gates).</li>
+    </ol>
+  </li>
+  <li><strong>Normalize to $[2, 4)$ in fixed-point:</strong>
+    compute $\texttt{shift} = (P+2) - \texttt{exp2}$. Since $a \in [2^n, 2^{n+1})$, shifting by <code>shift</code> maps $a$ into $[2^{P+1}, 2^{P+2})$, which represents the interval $[2, 4)$ at scale $S = 2^P$.
+    <ul>
+      <li>If $\texttt{shift} \geq 0$: $a_{\text{norm}} = a \cdot 2^{\texttt{shift}}$ (left shift = multiply).</li>
+      <li>If $\texttt{shift} < 0$: $a_{\text{norm}} = a / 2^{|\texttt{shift}|}$ (right shift = <code>div_mod_var</code>).</li>
+    </ul>
+    Both branches are witnessed; <code>is_neg(shift)</code> selects the correct one.
+  </li>
+  <li><strong>Polynomial evaluation:</strong> apply the degree-14 Remez polynomial (§9.1, interval $[2, 4)$) to $a_{\text{norm}}$, giving $\log_2(a_{\text{norm}}) \in [1, 2)$ at scale $S$.</li>
+  <li><strong>Integer correction:</strong> $\log_2 a = \log_2 a_{\text{norm}} - \texttt{shift}$. Convert $-\texttt{shift}$ to fixed-point by multiplying by $S$: $\texttt{log\_shift\_q} = (-\texttt{shift}) \cdot S$. Final result: $\texttt{log\_a\_norm} + \texttt{log\_shift\_q}$.</li>
+</ol>
+<p><em>Cost: ~$2P + 290$ rows (domain check ~3, MSB verify ~$4P$, shift ~10, Horner 14×, integer add ~2).</em></p>
+
+<p><strong><code>qlog(a)</code></strong> &mdash; $\ln \hat{a}$</p>
+<p>Uses $\ln x = \log_2 x / \log_2 e$:</p>
+<ol>
+  <li>Load constant $\log_2 e \approx 1.4427\ldots$ (quantized).</li>
+  <li>Compute <code>qlog2(a)</code>.</li>
+  <li>Return <code>qdiv(log2_a, log2e)</code>.</li>
+</ol>
+<p><em>Cost: qlog2 cost + ~20 rows.</em></p>
+
+<h4 id="s9-5-4">9.5.4 Trigonometric Functions</h4>
+
+<p><strong><code>qsin(a)</code></strong> &mdash; $\sin \hat{a}$</p>
+<p>Uses periodic range reduction and the identity $\sin(-x) = -\sin(x)$:</p>
+<ol>
+  <li><strong>Extract sign:</strong> $s = \texttt{is\_neg}(a)$; compute $|a|$ via <code>qabs</code>.</li>
+  <li><strong>Reduce to $[0, 2\pi)$:</strong> $a' = |a| \bmod 2\pi$ via <code>qmod</code>.</li>
+  <li><strong>Split at $\pi$:</strong> compute $a'' = a' - \pi$ via <code>qsub</code> and check $\texttt{is\_neg}(a'')$.
+    <ul>
+      <li>If $a'' < 0$ (i.e., $a' \in [0, \pi)$): evaluate the degree-14 polynomial directly on $a'$.</li>
+      <li>If $a'' \geq 0$ (i.e., $a' \in [\pi, 2\pi)$): evaluate the polynomial on $a''$, then negate (using $\sin(x + \pi) = -\sin(x)$).</li>
+    </ul>
+    Both branches are computed; <code>select</code> picks the correct one.
+  </li>
+  <li><strong>Restore sign:</strong> $\sin(a) = -\sin(|a|)$ if $a < 0$, via <code>cond_neg(result, s)</code>.</li>
+</ol>
+<p><em>Cost: ~460 rows (2× Horner degree-14 + qmod + 2× qabs + selects).</em></p>
+
+<p><strong><code>qcos(a)</code></strong> &mdash; $\cos \hat{a}$</p>
+<p>Uses the phase-shift identity $\cos x = \sin(x + \pi/2)$:</p>
+<ol>
+  <li>Load constant $\pi/2$ (quantized).</li>
+  <li>Compute $a' = a + \pi/2$ via <code>qadd</code>.</li>
+  <li>Return <code>qsin(a')</code>.</li>
+</ol>
+<p><em>Cost: qsin cost + 1 row.</em></p>
+
+<p><strong><code>qtan(a)</code></strong> &mdash; $\tan \hat{a}$</p>
+<p>Uses the ratio identity $\tan x = \sin x / \cos x$:</p>
+<ol>
+  <li>Compute <code>qsin(a)</code> and <code>qcos(a)</code> in sequence.</li>
+  <li>Return <code>qdiv(sin_a, cos_a)</code>.</li>
+</ol>
+<p><em>Warning: undefined (division by zero) when $a = \pi/2 + k\pi$; the prover must avoid such inputs. Cost: ~940 rows (2× qsin + qdiv).</em></p>
+
+<h4 id="s9-5-5">9.5.5 Hyperbolic Functions</h4>
+
+<p><strong><code>qsinh(a)</code></strong> &mdash; $\sinh \hat{a}$</p>
+<p>Uses the definition $\sinh x = (e^x - e^{-x}) / 2$:</p>
+<ol>
+  <li>Compute $e^a$ via <code>qexp(a)</code>.</li>
+  <li>Compute $e^{-a}$ via <code>qexp(neg(a))</code>.</li>
+  <li>Numerator: <code>qsub(ea, e_na)</code>.</li>
+  <li>Load constant $2_q$; return <code>qdiv(numerator, 2)</code>.</li>
+</ol>
+<p><em>Cost: ~540 rows (2× qexp + qdiv).</em></p>
+
+<p><strong><code>qcosh(a)</code></strong> &mdash; $\cosh \hat{a}$</p>
+<p>Uses $\cosh x = (e^x + e^{-x}) / 2$. Same structure as <code>qsinh</code> but with <code>qadd</code> instead of <code>qsub</code>. <em>Cost: ~540 rows.</em></p>
+
+<p><strong><code>qtanh(a)</code></strong> &mdash; $\tanh \hat{a}$</p>
+<p>Uses $\tanh x = \sinh x / \cosh x$:</p>
+<ol>
+  <li>Compute <code>qsinh(a)</code> and <code>qcosh(a)</code>.</li>
+  <li>Return <code>qdiv(sinh, cosh)</code>.</li>
+</ol>
+<p><em>Cost: ~1100 rows.</em></p>
+
+<h4 id="s9-5-6">9.5.6 Power and Root</h4>
+
+<p><strong><code>qpow(x, exponent)</code></strong> &mdash; $\hat{x}^{\hat{a}}$</p>
+<p>Uses the identity $x^a = e^{a \ln x}$:</p>
+<ol>
+  <li>Compute $\ln x$ via <code>qlog(x)</code> (requires $x > 0$).</li>
+  <li>Compute $a \cdot \ln x$ via <code>qmul(exponent, log_x)</code>.</li>
+  <li>Return <code>qexp(a_logx)</code>.</li>
+</ol>
+<p><em>Cost: qlog + qmul + qexp $\approx$ 560 rows.</em></p>
+
+<p><strong><code>qsqrt(x)</code></strong> &mdash; $\sqrt{\hat{x}}$</p>
+<p>Uses the identity $\sqrt{x} = x^{1/2}$:</p>
+<ol>
+  <li>Load constant $1/2$ (quantized as $S / 2$).</li>
+  <li>Return <code>qpow(x, 0.5)</code>.</li>
+</ol>
+<p><em>Cost: same as <code>qpow</code>, ~560 rows.</em></p>
+
+<div class="info-box">
+<strong>Function Cost Summary</strong><br>
+<table style="margin-top:0.5em">
+<thead><tr><th>Function</th><th>Algorithm</th><th>Approx. rows</th></tr></thead>
+<tbody>
+<tr><td><code>qadd</code> / <code>qsub</code></td><td>gate primitive</td><td>1</td></tr>
+<tr><td><code>qmul</code></td><td>mul + signed_div_scale</td><td>~12</td></tr>
+<tr><td><code>qdiv</code></td><td>pre-scale + div_mod_var</td><td>~20</td></tr>
+<tr><td><code>qmod</code></td><td>div_mod_var + sign</td><td>~15</td></tr>
+<tr><td><code>is_neg</code> / <code>qabs</code></td><td>bit decomposition</td><td>~13–15</td></tr>
+<tr><td><code>qmax</code> / <code>qmin</code></td><td>qsub + is_neg + select</td><td>~18</td></tr>
+<tr><td><code>qexp2</code></td><td>split + table + Horner(12)</td><td>~240</td></tr>
+<tr><td><code>qexp</code></td><td>qdiv + qexp2</td><td>~260</td></tr>
+<tr><td><code>qlog2</code></td><td>MSB hint + normalize + Horner(14)</td><td>~$2P+290$</td></tr>
+<tr><td><code>qlog</code></td><td>qlog2 + qdiv</td><td>~$2P+310$</td></tr>
+<tr><td><code>qsin</code></td><td>qmod + 2×Horner(14) + select</td><td>~460</td></tr>
+<tr><td><code>qcos</code></td><td>qadd + qsin</td><td>~461</td></tr>
+<tr><td><code>qtan</code></td><td>qsin + qcos + qdiv</td><td>~940</td></tr>
+<tr><td><code>qsinh</code> / <code>qcosh</code></td><td>2×qexp + qdiv</td><td>~540</td></tr>
+<tr><td><code>qtanh</code></td><td>qsinh + qcosh + qdiv</td><td>~1100</td></tr>
+<tr><td><code>qpow</code></td><td>qlog + qmul + qexp</td><td>~560</td></tr>
+<tr><td><code>qsqrt</code></td><td>qpow(x, 0.5)</td><td>~560</td></tr>
+</tbody>
+</table>
+<p style="margin-top:0.5em;font-size:0.9em;">Row counts are estimates for $P = 32$; actual counts depend on range-check bit widths.</p>
+</div>
+
 <!-- ════════════════════════════════════════════ -->
 <h2 id="s10">10. ZK Machine Learning Circuits</h2>
 
-<p>With fixed-point arithmetic and function approximation in hand, we can build full machine learning algorithms as ZK circuits.</p>
+<p>Each ML model is assembled from the arithmetic and gadget primitives defined in Sections 8 and 9. The common circuit pattern is:</p>
+<ol>
+  <li>Model weights and training data go into <strong>advice columns</strong> (private witness).</li>
+  <li>Public outputs (final predictions, loss value) go into <strong>instance columns</strong> — the verifier checks these directly.</li>
+  <li>Every arithmetic step is enforced by a gate constraint or lookup argument.</li>
+  <li>The prover fills the table and generates a proof; the verifier checks it without seeing any private data.</li>
+</ol>
 
 <h3 id="s10-1">10.1 Linear Regression</h3>
+
+<p>Uses <code>FixedPointChip&lt;F, 32&gt;</code> — 32.32 fixed-point, $S = 2^{32}$.</p>
+
+<h4>Circuit Layout</h4>
+<p>For a $d$-dimensional model with batch size $m$, the column assignment is:</p>
+<table>
+<thead><tr><th>Column type</th><th>Contents</th></tr></thead>
+<tbody>
+<tr><td>Advice</td><td>$w_1,\dots,w_d$, $b$ (weights/bias); per-sample $x_1^{(j)},\dots,x_d^{(j)}$; intermediate products $w_i x_i^{(j)}$; running dot-product accumulator; residuals $e^{(j)} = \hat{y}^{(j)} - y^{(j)}$; per-weight gradient accumulators $g_i = \sum_j e^{(j)} x_i^{(j)}$</td></tr>
+<tr><td>Instance</td><td>Updated weights $w_i'$ and bias $b'$ after one SGD step (public: verifier checks these)</td></tr>
+<tr><td>Fixed/Selector</td><td>Activates <code>qmul</code> / <code>qadd</code> / <code>qsub</code> gates at the correct rows; stores the constant $\eta/m$ (learning rate pre-divided by batch size)</td></tr>
+</tbody>
+</table>
 
 <h4>Inference</h4>
 <p>Given weight vector $\mathbf{w} \in \mathbb{R}^d$, bias $b$, and input $\mathbf{x} \in \mathbb{R}^d$:</p>
 $$\hat{y} = \mathbf{w} \cdot \mathbf{x} + b = \sum_{i=1}^d w_i x_i + b.$$
-<p>In circuit: <code>inner_product</code> computes $\sum w_i x_i$ using $d$ <code>qmul</code> + $(d-1)$ <code>qadd</code> gates, then one <code>qadd</code> for the bias.</p>
+<p>Circuit steps:</p>
+<ol>
+  <li><code>inner_product(w, x)</code> — $d$ calls to <code>qmul</code> followed by $d-1$ calls to <code>qadd</code>, yielding $\mathbf{w}\cdot\mathbf{x}$ (~$11d$ rows).</li>
+  <li><code>qadd(wx, b)</code> — adds the bias (1 row).</li>
+</ol>
+<p><em>Total inference cost: ~$11d + 1$ rows per sample.</em></p>
 
 <h4>Training (Mini-Batch SGD)</h4>
-<p>Given a batch of $m$ samples $\{(\mathbf{x}^{(j)}, y^{(j)})\}_{j=1}^m$, the gradient descent update is:</p>
+<p>Given a batch of $m$ samples $\{(\mathbf{x}^{(j)}, y^{(j)})\}_{j=1}^m$, one SGD step is:</p>
+$$\text{Loss} = \frac{1}{2m} \sum_{j=1}^m \bigl(\hat{y}^{(j)} - y^{(j)}\bigr)^2$$
+$$\frac{\partial \text{Loss}}{\partial w_i} = \frac{1}{m} \sum_{j=1}^m e^{(j)} \cdot x_i^{(j)}, \qquad e^{(j)} = \hat{y}^{(j)} - y^{(j)}$$
+$$w_i \leftarrow w_i - \frac{\eta}{m} \cdot \sum_{j=1}^m e^{(j)} x_i^{(j)}, \qquad b \leftarrow b - \frac{\eta}{m} \cdot \sum_{j=1}^m e^{(j)}$$
 
-$$\text{Loss} = \frac{1}{2m} \sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)})^2$$
+<p>The circuit for <code>train_one_batch</code> executes the following sequence:</p>
+<ol>
+  <li><strong>Load learning rate.</strong> The scalar $\eta/m$ is loaded as a witness cell (the division by $m$ happens off-circuit; the circuit only sees the pre-scaled constant).</li>
+  <li><strong>Forward pass</strong> (for each sample $j = 1, \dots, m$):
+    <ul>
+      <li><code>inner_product(w, x[j])</code> — dot product (~$11d$ rows).</li>
+      <li><code>qadd(wx, b)</code> — add bias (1 row).</li>
+      <li><code>qsub(y_hat, y_truth[j])</code> — compute residual $e^{(j)}$ (1 row).</li>
+    </ul>
+  </li>
+  <li><strong>Gradient accumulation</strong> (for each weight $i = 1, \dots, d$):
+    <ul>
+      <li>For each sample $j$: <code>qmul(e[j], x[j][i])</code> — scale residual by feature (1 row).</li>
+      <li><code>qsum([qmul results])</code> — accumulate over samples ($m-1$ rows).</li>
+    </ul>
+  </li>
+  <li><strong>Weight update</strong> (for each weight $i$):
+    <ul>
+      <li><code>qmul(lr, g_i)</code> — scale gradient by $\eta/m$ (1 row).</li>
+      <li><code>qsub(w[i], delta_w_i)</code> — subtract from weight (1 row).</li>
+    </ul>
+  </li>
+  <li><strong>Bias update</strong>:
+    <ul>
+      <li><code>qsum(e[])</code> — sum all residuals.</li>
+      <li><code>qmul(lr, partial_b)</code> + <code>qsub(b, delta_b)</code>.</li>
+    </ul>
+  </li>
+</ol>
 
-$$\frac{\partial \text{Loss}}{\partial w_i} = \frac{1}{m} \sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)}) \cdot x_i^{(j)}$$
+<div class="info-box">
+<strong>Loss is a hint, not a constraint.</strong> The MSE loss value is computed off-circuit (using <code>dequantization</code> on the residuals) and printed as a warning log. It is <em>not</em> constrained in the circuit — the circuit only enforces that the weight update formula was applied correctly. The verifier trusts the circuit constraints, not the logged loss value.
+</div>
 
-$$w_i \leftarrow w_i - \eta \cdot \frac{\partial \text{Loss}}{\partial w_i}, \qquad b \leftarrow b - \eta \cdot \frac{1}{m}\sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)})$$
-
-<p>All of these are polynomial operations (multiply, add, subtract) over quantized values, directly expressible as PLONKish constraints.</p>
+<div class="info-box">
+<strong>Overflow prevention.</strong> Each <code>qmul</code> gate enforces $a \cdot b = c \cdot 2^P + r$ with a range check $0 \leq r < 2^P$. The range check uses a lookup argument against the table $\{0, \dots, 2^{15}-1\}$, decomposing $r$ into two 15-bit chunks.
+</div>
 
 <figure>
 <img src="../figure/demo_linear_regression_train.png" alt="ZK linear regression training: loss curve showing ZK and non-ZK versions converge with negligible error, alongside proof generation terminal output." style="max-width:680px; width:100%;">
@@ -1816,43 +2239,172 @@ $$w_i \leftarrow w_i - \eta \cdot \frac{\partial \text{Loss}}{\partial w_i}, \qq
 
 <h3 id="s10-2">10.2 Logistic Regression</h3>
 
-<h4>Inference</h4>
-<p>The logistic model uses the <strong>sigmoid</strong> activation:</p>
-$$\hat{y} = \sigma(\mathbf{w} \cdot \mathbf{x} + b) = \frac{1}{1 + e^{-(\mathbf{w} \cdot \mathbf{x} + b)}}.$$
-<p>In circuit: compute the linear part, negate it, apply <code>qexp</code>, add 1, then <code>qdiv</code> by the result. The <code>qexp</code> call chains through $e^x = 2^{x/\ln 2}$, invoking the full range-reduction + polynomial pipeline.</p>
+<p>Uses <code>FixedPointChip&lt;F, 63&gt;</code> — 63.63 fixed-point, $S = 2^{63}$. The higher precision is necessary because the sigmoid function and the $\exp$ approximation amplify rounding errors near $z = 0$.</p>
 
-<h4>Training (Binary Cross-Entropy)</h4>
+<h4>Inference</h4>
+<p>The logistic model applies the sigmoid activation to the linear combination:</p>
+$$\hat{y} = \sigma(\mathbf{w} \cdot \mathbf{x} + b) = \frac{1}{1 + e^{-(\mathbf{w} \cdot \mathbf{x} + b)}}.$$
+<p>The exact circuit operations, in order:</p>
+<ol>
+  <li><code>inner_product(w, x)</code> — $\mathbf{w}\cdot\mathbf{x}$ (~$11d$ rows).</li>
+  <li><code>qadd(wx, b)</code> — logit $z = \mathbf{w}\cdot\mathbf{x} + b$ (1 row).</li>
+  <li><code>neg(z)</code> — negate: $z' = -z$ (1 row, field negation, no cost).</li>
+  <li><code>qexp(z')</code> — $e' = e^{-z}$ via $2^{z'/\ln 2}$ (~260 rows).</li>
+  <li><code>qadd(e', 1_q)</code> — $d' = 1 + e^{-z}$; the constant $1_q = S = 2^{63}$ is stored as a fixed-column constant (1 row).</li>
+  <li><code>qdiv(1_q, d')</code> — $\hat{y} = 1 / d'$ (~20 rows).</li>
+</ol>
+<p><em>Total inference cost: ~$11d + 283$ rows per sample.</em></p>
+
+<h4>Training (Binary Cross-Entropy, Mini-Batch SGD)</h4>
 <p>The loss function is:</p>
 $$\text{BCE} = -\frac{1}{m}\sum_{j=1}^m \bigl[y^{(j)} \ln \hat{y}^{(j)} + (1 - y^{(j)}) \ln(1 - \hat{y}^{(j)})\bigr].$$
 
-<p>The gradient has the same form as linear regression (a well-known simplification):</p>
-$$\frac{\partial \text{BCE}}{\partial w_i} = \frac{1}{m} \sum_{j=1}^m (\hat{y}^{(j)} - y^{(j)}) \cdot x_i^{(j)}.$$
+<p>The gradient simplifies to the same form as linear regression (a consequence of the sigmoid being the canonical link for the Bernoulli distribution):</p>
+$$\frac{\partial \text{BCE}}{\partial w_i} = \frac{1}{m} \sum_{j=1}^m \bigl(\hat{y}^{(j)} - y^{(j)}\bigr) \cdot x_i^{(j)}.$$
 
-<p>This requires <code>qlog</code> for the loss computation, which in turn uses the log polynomial approximation.</p>
+<p>The circuit for <code>train_one_batch</code> executes:</p>
+<ol>
+  <li><strong>Load learning rate.</strong> $\eta$ is loaded as a fixed constant (not divided by $m$ here — the caller passes a per-batch rate <code>learning_rate_batch</code>).</li>
+  <li><strong>Forward pass</strong> (for each sample $j$):
+    <ul>
+      <li>Same 6-step inference chain above, yielding $\hat{y}^{(j)}$.</li>
+      <li><code>qsub(y_hat, y_truth[j])</code> — residual $e^{(j)}$ (1 row).</li>
+    </ul>
+  </li>
+  <li><strong>BCE loss (off-circuit hint only).</strong> For each sample, the dequantized $\hat{y}^{(j)}$ and $y^{(j)}$ are used to compute $-\ln(\hat{y}^{(j)})$ or $-\ln(1-\hat{y}^{(j)})$ in floating point. The sum is printed as a warning log. No BCE-related rows are added to the circuit.</li>
+  <li><strong>Gradient accumulation</strong> (same structure as linear regression):
+    <ul>
+      <li>For each weight $i$ and sample $j$: <code>qmul(e[j], x[j][i])</code>.</li>
+      <li><code>qsum</code> over samples; <code>qmul(lr, g_i)</code>; <code>qsub(w[i], delta)</code>.</li>
+    </ul>
+  </li>
+  <li><strong>Bias update</strong> — same as linear regression.</li>
+</ol>
+
+<p>The wrapper <code>train_multi_batch</code> simply calls <code>train_one_batch</code> in a loop over batches, threading the updated weights $(w, b)$ from one call to the next. All batches land in the same proof.</p>
 
 <div class="info-box">
-<strong>Precision note:</strong> Logistic regression uses 63.63 fixed-point precision (vs. 32.32 for linear regression) because the sigmoid and log computations are numerically sensitive and require more fractional bits to maintain accuracy.
+<strong>Precision note:</strong> Using $P = 63$ (instead of 32) means $S = 2^{63} \approx 9.2 \times 10^{18}$. The quantization error per value is $\leq 2^{-64} \approx 5.4 \times 10^{-20}$. This is needed because $e^{-z}$ for $z$ near 0 is sensitive: a small error in the exponent produces a first-order error in $\hat{y}$, which then feeds into the gradient. With $P = 32$ the accumulated gradient error would be large enough to corrupt convergence.
 </div>
 
 <h3 id="s10-3">10.3 Decision Tree</h3>
 
-<h4>Inference (Tree Traversal)</h4>
-<p>A decision tree is a binary tree where each internal node stores a feature index $f$ and a threshold $t$. At each node, we branch:</p>
-$$\text{go left if } x_f \leq t, \qquad \text{go right if } x_f > t.$$
-<p>In circuit: each comparison uses <code>RangeInstructions::is_less_than</code>, which decomposes the difference into bits and checks the range&mdash;all via lookup arguments.</p>
+<p>Uses <code>FixedPointChip&lt;F, 63&gt;</code> for both inference and training. The tree is stored as a flat array of nodes.</p>
+
+<h4>Node Encoding</h4>
+<p>Each node occupies 5 consecutive slots in the flat array:</p>
+$$\text{tree}[5k + 0] = \text{data\_slot}_k, \quad \text{tree}[5k+1] = \text{split}_k, \quad \text{tree}[5k+2] = \text{left\_idx}_k, \quad \text{tree}[5k+3] = \text{right\_idx}_k, \quad \text{tree}[5k+4] = \text{cls}_k.$$
+<ul>
+  <li><strong>data_slot</strong>: the feature index to compare (integer, not quantized).</li>
+  <li><strong>split</strong>: the threshold value (quantized fixed-point).</li>
+  <li><strong>left_idx / right_idx</strong>: child node indices. For a leaf node, $\text{left\_idx} = \text{right\_idx} = k$ (self-loop).</li>
+  <li><strong>cls</strong>: the predicted class if this is a leaf (raw integer, not quantized). Set to the sentinel <code>MASK_CLS = 255</code> for internal nodes.</li>
+</ul>
+<p>All tree values are stored in <strong>fixed columns</strong> (compile-time constants), so they are part of the verification key and cannot be altered.</p>
+
+<h4>Inference Circuit</h4>
+<p>Given: the flat tree array (fixed), input feature vector $\mathbf{x}$ (advice witness), and a parameter <code>max_path_len</code> (the maximum depth to simulate). Steps:</p>
+<ol>
+  <li><strong>Initialize.</strong> Load $\mathbf{x}$ into advice cells $x_{\text{adv}}$. Set $\text{node\_idx} = 0$.</li>
+  <li><strong>Repeat for</strong> $\ell = 1, \dots, \text{max\_path\_len}$:
+    <ol type="a">
+      <li>$\text{offset} = \text{node\_idx} \times 5$ via <code>mul(node_idx, 5)</code>.</li>
+      <li>$\text{data\_slot} = \text{tree}[\text{offset}]$ via <code>select_from_idx(tree, offset+0)</code>.</li>
+      <li>Load a fresh copy of $\mathbf{x}$ and constrain each $x_{\text{copy},i} = x_{\text{adv},i}$ via copy constraints (ensures the same input is used at every step).</li>
+      <li>$\text{data} = x_{\text{copy}}[\text{data\_slot}]$ via <code>select_from_idx(x_copy, data_slot)</code>.</li>
+      <li>$\text{split} = \text{tree}[\text{offset}+1]$ via <code>select_from_idx</code>.</li>
+      <li>$\text{diff} = \text{data} - \text{split}$ via <code>qsub</code>; $\text{is\_less} = \texttt{is\_neg}(\text{diff})$.</li>
+      <li>$\text{left} = \text{tree}[\text{offset}+2]$, $\text{right} = \text{tree}[\text{offset}+3]$ via <code>select_from_idx</code>.</li>
+      <li>$\text{node\_idx} = \text{select}(\text{left}, \text{right}, \text{is\_less})$.</li>
+    </ol>
+  </li>
+  <li><strong>Read class.</strong> After the loop: $\text{offset} = \text{node\_idx} \times 5$; $\text{cls} = \text{tree}[\text{offset}+4]$.</li>
+</ol>
+<p>Because self-loops are enforced for leaf nodes, <code>node_idx</code> freezes at the first leaf reached and stays there for the remaining steps. The final <code>cls</code> is therefore always the correct prediction regardless of path length.</p>
+<p><em>Cost per step: ~$5 \times O(n)$ for <code>select_from_idx</code> (where $n$ = tree size) + <code>qsub</code> + <code>is_neg</code> + <code>select</code>. Total: <code>max_path_len</code> $\times$ (~$5n + 18$) rows.</em></p>
+
+<div class="info-box">
+<strong>ZK circuit constraint: fixed computation size.</strong> ZK circuits require every execution path to have the same number of rows. A decision tree has variable-depth paths. Two techniques enforce uniformity:
+<ul style="margin-top:0.5rem;">
+  <li><strong>Self-loops at leaves:</strong> once a leaf is reached, both child pointers point back to the same node, so the traversal stays put for the remaining steps without revealing when the leaf was reached.</li>
+  <li><strong>Complete binary tree padding:</strong> the tree is padded to a complete binary tree of depth <code>max_depth</code> by adding fake internal nodes. These nodes are unreachable (since real leaves have self-loops), but their presence keeps the tree structure uniform and the fixed-column layout regular.</li>
+</ul>
+</div>
 
 <figure>
 <img src="../figure/decision_tree_inference.png" alt="Decision tree inference with path padding: variable-length paths are padded to equal length via self-loops at leaf nodes. Fake nodes (blue dashed) complete the binary tree." style="max-width:420px; width:100%;">
-<figcaption>ZK-friendly tree traversal. <strong>Path padding</strong>: leaf nodes have self-loops so all paths have equal length (ZK circuits require fixed-size computation). <strong>Fake nodes</strong> (blue dashed): added to make the tree a complete binary tree&mdash;they are never reached due to the self-loops at real leaf nodes (yellow).</figcaption>
+<figcaption>ZK-friendly tree traversal. <strong>Self-loops</strong>: leaf nodes point to themselves so all paths have equal circuit length. <strong>Fake nodes</strong> (blue dashed): added to make the tree a complete binary tree&mdash;they are never reached due to the self-loops at real leaf nodes (yellow).</figcaption>
 </figure>
 
-<h4>Training (Gini Impurity)</h4>
-<p>The tree is built by recursively finding the best split. For a node with $n$ samples containing $n_k$ samples of class $k$:</p>
-$$\text{Gini}(S) = 1 - \sum_k \left(\frac{n_k}{n}\right)^2.$$
-<p>The best split minimizes the weighted Gini impurity of the children:</p>
-$$\text{Split cost} = \frac{|S_L|}{|S|} \cdot \text{Gini}(S_L) + \frac{|S_R|}{|S|} \cdot \text{Gini}(S_R).$$
+<h4>Training Circuit</h4>
 
-<p>In circuit, the training uses <strong>bitmasks</strong> to track which samples belong to each subtree, and computes Gini impurity via quantized arithmetic (<code>qmul</code>, <code>qdiv</code>, <code>qsub</code>).</p>
+<p>Training builds the tree layer by layer (BFS), executing the following sub-circuits.</p>
+
+<h5>Gini Impurity (<code>gini</code>)</h5>
+<p>Given a dataset of $n$ samples, a feature slot, a split value, and a bitmask $m_i \in \{0,1\}$ indicating which samples are active in the current node, computes the weighted Gini impurity of the proposed split:</p>
+$$\text{Gini}(S) = 1 - \sum_{k=0}^{K-1} \left(\frac{n_k}{n}\right)^2, \qquad \text{Split cost} = \frac{|S_L|}{n}\cdot\text{Gini}(S_L) + \frac{|S_R|}{n}\cdot\text{Gini}(S_R).$$
+<p>Circuit steps for each group $G \in \{L, R\}$:</p>
+<ol>
+  <li>For each sample $i$:
+    <ul>
+      <li>$\text{diff}_i = x_i[\text{slot}] - \text{split}$ via <code>qsub</code>; $\text{is\_less}_i = \texttt{is\_neg}(\text{diff}_i)$.</li>
+      <li>$\text{in\_left}_i = \text{is\_less}_i \cdot m_i$ via <code>mul</code>; $\text{in\_right}_i = (1 - \text{is\_less}_i) \cdot m_i$.</li>
+      <li>For each class $k$: $\text{is\_class}_{i,k} = \texttt{is\_equal}(y_i, k)$ (1 row); accumulate $n_{k,G} \mathrel{+}= \text{is\_class}_{i,k} \cdot \text{in\_G}_i$.</li>
+      <li>Accumulate group size: $|G| \mathrel{+}= \text{in\_G}_i$.</li>
+    </ul>
+  </li>
+  <li>Compute $p_{k,G} = n_{k,G} / |G|$ (scale and divide via <code>div_mod_var</code>). An epsilon of 1 is added to $|G|$ to prevent division by zero at empty nodes.</li>
+  <li>$\text{Gini}_G = 1 - \sum_k p_{k,G}^2$. Each $p_{k,G}^2$ is computed via the internal <code>square</code> helper (a raw <code>mul</code> + <code>div_mod</code> rescale, ~5 rows).</li>
+  <li>$\text{weight}_G = |G| / n$ via <code>div_mod_var</code>; multiply: $\text{weighted\_Gini}_G = \text{weight}_G \cdot \text{Gini}_G$.</li>
+  <li>Sum: $\text{Split cost} = \text{weighted\_Gini}_L + \text{weighted\_Gini}_R$.</li>
+  <li>Edge case: if $n \leq 1$ (leaf node), force Gini = 1 (highest possible, so this node is never chosen as the best split).</li>
+</ol>
+
+<h5>Best Split Search (<code>get_split</code>)</h5>
+<p>Iterates over all feature–sample pairs as candidate splits and finds the one with minimum Gini cost:</p>
+<ol>
+  <li>Initialize $\text{best\_gini} = 1_q$ (maximum Gini), $\text{best\_slot} = 0$, $\text{best\_split} = x_0$.</li>
+  <li>For each feature $f$ and each sample $i$ as the split candidate $s = x_i[f]$:
+    <ul>
+      <li>Intersect mask with the sample's own mask bit to derive the active mask.</li>
+      <li>Call <code>gini(dataset_x, dataset_y, mask, slot=f, split=s)</code>.</li>
+      <li>$\text{is\_better} = \texttt{is\_less\_than}(\text{gini}, \text{best\_gini})$.</li>
+      <li>Update via <code>select</code>: $\text{best\_gini} \leftarrow \text{select}(\text{gini},\ \text{best\_gini},\ \text{is\_better})$, and similarly for slot and split.</li>
+    </ul>
+  </li>
+  <li>Return $(\text{best\_slot}, \text{best\_split})$.</li>
+</ol>
+<p><em>Note: this is an $O(n \times F)$ loop over samples and features, where each iteration calls <code>gini</code> — the most expensive operation in the circuit. The total circuit size scales as $O(n^2 F K)$ for $K$ classes.</em></p>
+
+<h5>Majority Class (<code>common_cls</code>)</h5>
+<p>Finds the most frequent class among masked samples:</p>
+<ol>
+  <li>For each class $k = 0, \dots, K-1$: count $c_k = \sum_i m_i \cdot \mathbf{1}[y_i = k]$ using <code>is_equal</code> + <code>mul</code> + <code>add</code>.</li>
+  <li>Find the argmax via a sequential scan: maintain $(\text{max\_cnt}, \text{out\_cls})$; for each $k$, compute $\text{is\_better} = \texttt{is\_less\_than}(\text{max\_cnt}, c_k)$ and update both via <code>select</code>.</li>
+</ol>
+
+<h5>Full Tree Training (<code>train</code>)</h5>
+<p>Builds a complete binary tree of depth <code>max_depth</code> using BFS:</p>
+<ol>
+  <li><strong>Initialize queue</strong> with a single all-ones mask (all samples active at the root).</li>
+  <li><strong>For each layer</strong> $\ell = 0, \dots, \text{max\_depth}-1$: process all nodes in the current BFS level:
+    <ol type="a">
+      <li>Pop the current node's mask from the queue.</li>
+      <li>Count active samples: $n_{\text{node}} = \texttt{qsum}(\text{mask})$.</li>
+      <li>$\text{is\_leaf} = \texttt{is\_less\_than}(n_{\text{node}},\ \text{min\_size})$ — force leaf if too few samples.</li>
+      <li>Call <code>get_split</code> to get $(\text{best\_slot}, \text{best\_split})$.</li>
+      <li>Update left/right masks: for each sample $i$, multiply the current mask by $\text{is\_left}_i$ or $\text{is\_right}_i$. Push both to the queue for the next layer.</li>
+      <li>Call <code>common_cls</code> on the current mask to get $\text{cls}$.</li>
+      <li><strong>Emit node record:</strong>
+        <ul>
+          <li>If <strong>not</strong> last layer: $\text{left\_child} = 2k+1$, $\text{right\_child} = 2k+2$ (BFS indices). If forced leaf, override both to $k$ (self-loop) and set <code>best_slot = best_split = 0</code>, $\text{cls} = \text{MASK\_CLS} = 255$ as sentinel.</li>
+          <li>If last layer: always emit a leaf: $\text{left\_child} = \text{right\_child} = k$, $\text{cls} = \texttt{common\_cls}$.</li>
+        </ul>
+      </li>
+    </ol>
+  </li>
+  <li>Flatten all node records into the output flat array $[\text{slot}_0, \text{split}_0, \text{left}_0, \text{right}_0, \text{cls}_0, \text{slot}_1, \dots]$.</li>
+</ol>
 
 <figure>
 <img src="../figure/demo_decision_tree.png" alt="ZK decision tree training demo: generated tree visualization with splitting nodes (green), leaf nodes (yellow), and fake nodes (blue dashed), alongside proof verification output." style="max-width:680px; width:100%;">
@@ -1987,32 +2539,49 @@ $$\text{Split cost} = \frac{|S_L|}{|S|} \cdot \text{Gini}(S_L) + \frac{|S_R|}{|S
 
 <h3 id="s11-1">11.1 What the Proof Guarantees</h3>
 
-<p>A valid proof convinces the verifier that:</p>
+<p>A valid Halo2 proof provides four formal guarantees:</p>
 <ol>
-  <li><strong>Correctness:</strong> The prover executed the ML computation faithfully (every gate constraint is satisfied).</li>
-  <li><strong>Completeness:</strong> An honest prover can always produce a valid proof.</li>
-  <li><strong>Soundness:</strong> A cheating prover cannot produce a valid proof for an incorrect computation (except with negligible probability $\leq 2^{-128}$).</li>
-  <li><strong>Zero-Knowledge:</strong> The proof reveals nothing about the private inputs (model weights, training data) beyond what is implied by the public outputs.</li>
+  <li><strong>Correctness:</strong> The prover executed the ML computation faithfully — every gate constraint $g_j(\omega^i) = 0$ is satisfied at every row, every range check passes, and every copy constraint is respected. The verifier confirms this without re-running the computation.</li>
+  <li><strong>Completeness:</strong> An honest prover who knows a valid witness can always produce an accepting proof. No correct computation is ever rejected.</li>
+  <li><strong>Soundness:</strong> A cheating prover cannot produce a valid proof for an incorrect computation except with probability $\leq \frac{D}{|\mathbb{F}_p|} \approx 2^{-234}$ (from the Schwartz-Zippel bound in Section 6.5). In practice this is modelled as negligible: $\leq 2^{-128}$ after accounting for all attack surfaces.</li>
+  <li><strong>Zero-Knowledge:</strong> The proof reveals nothing about the private inputs (model weights, training data, intermediate activations) beyond what is already implied by the public outputs. This holds because the witness polynomials are blinded with random values before commitment.</li>
 </ol>
+
+<p>Together, soundness and zero-knowledge mean: the verifier is convinced the ML model was trained/inferred correctly, but learns nothing about the model itself — useful for proving model quality without disclosing proprietary weights.</p>
 
 <h3 id="s11-2">11.2 Concrete Costs</h3>
 
 <p>Each fixed-point operation translates to a known number of table rows:</p>
 
 <table>
-<thead><tr><th>Operation</th><th>Approx. Rows</th><th>Notes</th></tr></thead>
+<thead><tr><th>Operation</th><th>Approx. Rows</th><th>Bottleneck</th></tr></thead>
 <tbody>
-<tr><td><code>qadd</code> / <code>qsub</code></td><td>1</td><td>Single gate</td></tr>
-<tr><td><code>qmul</code></td><td>~10</td><td>1 mul + div_mod + range decomposition</td></tr>
-<tr><td><code>qdiv</code></td><td>~20</td><td>Pre-scale + div_mod_var + sign handling</td></tr>
-<tr><td><code>qexp2</code></td><td>~200</td><td>Range reduction + degree-12 Horner + conditional</td></tr>
-<tr><td><code>qlog2</code></td><td>~250</td><td>Normalization + degree-14 Horner + shift</td></tr>
-<tr><td><code>qsin</code></td><td>~300</td><td>Mod reduction + two degree-14 Horner + sign</td></tr>
-<tr><td>sigmoid $\sigma(x)$</td><td>~250</td><td><code>qexp</code> + <code>qdiv</code></td></tr>
+<tr><td><code>qadd</code> / <code>qsub</code></td><td>1</td><td>Single FlexGate row</td></tr>
+<tr><td><code>qmul</code></td><td>~10</td><td>Multiply + <code>div_mod</code> + 2 range-check lookups</td></tr>
+<tr><td><code>qdiv</code></td><td>~20</td><td>Pre-scale + <code>div_mod_var</code> + sign handling + range checks</td></tr>
+<tr><td><code>qexp2</code></td><td>~200</td><td>Integer/fractional split + degree-12 Horner chain + table lookup for $2^n$</td></tr>
+<tr><td><code>qlog2</code></td><td>~250</td><td>Bit-length normalization + degree-14 Horner + integer shift</td></tr>
+<tr><td><code>qsin</code></td><td>~300</td><td>Mod-$2\pi$ reduction + two degree-14 Horner evaluations + sign correction</td></tr>
+<tr><td>sigmoid $\sigma(x)$</td><td>~250</td><td><code>qneg</code> + <code>qexp</code> + <code>qadd</code> + <code>qdiv</code></td></tr>
 </tbody>
 </table>
 
-<p>With $k = 18$, the circuit supports up to $2^{18} = 262{,}144$ rows&mdash;enough for inference on small-to-medium models and training on small datasets.</p>
+<p>With $k = 18$, the circuit supports up to $2^{18} = 262{,}144$ rows. As a rough guide:</p>
+<ul>
+  <li>Linear regression inference ($d=10$): ~110 rows — trivially fits.</li>
+  <li>Logistic regression training ($d=10$, $m=100$ samples, 1 epoch): ~$100 \times (110 + 500) \approx 61{,}000$ rows — fits comfortably.</li>
+  <li>Decision tree ($\text{depth}=5$, 32 nodes): ~$32 \times 10 \approx 320$ rows for comparisons — very cheap.</li>
+</ul>
+
+<h3 id="s11-3">11.3 Limitations and Future Work</h3>
+
+
+<ul>
+  <li><strong>Circuit size:</strong> $k=18$ limits the circuit to $2^{18}$ rows. Larger models (deep neural networks, transformers) require either a larger $k$ (exponentially more prover memory) or recursive proof composition (chaining multiple proofs).</li>
+  <li><strong>Fixed-point precision:</strong> Rounding errors accumulate across layers. Deep models require careful precision tuning ($P$ bits) to avoid divergence.</li>
+  <li><strong>Non-polynomial operations:</strong> Operations like $\max$, $\text{argmax}$, and conditional branches require special gadgets (range decomposition, bit extraction) that are significantly more expensive than their floating-point equivalents.</li>
+  <li><strong>Training vs. inference:</strong> Proving a full training loop is far more expensive than proving a single inference. For large models, it is more practical to prove inference only (with public weights) and trust the training process, or use recursive proofs to batch training steps.</li>
+</ul>
 
 <hr>
 
@@ -2028,7 +2597,7 @@ $$\text{Split cost} = \frac{|S_L|}{|S|} \cdot \text{Gini}(S_L) + \frac{|S_R|}{|S
   <li>Axiom. <em>halo2-lib documentation.</em> <a href="https://docs.axiom.xyz/protocol/zero-knowledge-proofs/getting-started-with-halo2">https://docs.axiom.xyz</a></li>
   <li>Barreto, P. &amp; Naehrig, M. (2005). <em>Pairing-Friendly Elliptic Curves of Prime Order.</em> (BN curves.)</li>
   <li>Remez, E. (1934). <em>Sur la d&eacute;termination des polyn&ocirc;mes d'approximation de degr&eacute; donn&eacute;e.</em> Comm. Soc. Math. Kharkov.</li>
-  <li><em>Halo2 KZG &amp; SHPLONK — Proof Generation and Verification Walkthrough.</em> HackMD community note. <a href="https://hackmd.io/JaoTzYgqSY6lXDN4C5alXQ" target="_blank" rel="noopener">https://hackmd.io/JaoTzYgqSY6lXDN4C5alXQ</a></li>
+  <li>XIAO, Wentao. <em>ZK Fixed Point Arithmetic with its Application in Machine Learning.</em> HackMD. <a href="https://hackmd.io/JaoTzYgqSY6lXDN4C5alXQ" target="_blank" rel="noopener">https://hackmd.io/JaoTzYgqSY6lXDN4C5alXQ</a></li>
 </ol>
 
 <footer>
