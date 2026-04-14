@@ -458,9 +458,81 @@ footer {
   color: var(--dim);
   font-family: 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* --- Reference List --- */
+ol.reference-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 2rem;
+}
+ol.reference-list li {
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+ol.reference-list li:last-child { border-bottom: none; }
+.ref-label {
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 2rem;
+  flex-shrink: 0;
+}
+.ref-body a {
+  color: var(--accent2);
+  word-break: break-all;
+}
+
+/* --- Reading Progress Bar --- */
+#progress-bar-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: transparent;
+  z-index: 9999;
+  pointer-events: none;
+}
+#progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 0 2px 2px 0;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+#progress-label {
+  position: fixed;
+  top: 10px;
+  right: 16px;
+  z-index: 9999;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 12px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#progress-label.visible {
+  opacity: 1;
+}
 </style>
 </head>
 <body>
+
+<!-- Reading Progress Bar -->
+<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+<div id="progress-label">0% read</div>
 
 <!-- Sidebar overlay for mobile -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -565,11 +637,24 @@ footer {
 
 <h1>ZKFixedPointChip</h1>
 <p class="subtitle">Mathematical Foundations of Halo2 and Zero-Knowledge Machine Learning</p>
+<p id="reading-meta" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:0.8rem;color:var(--dim);margin-top:0.4rem;letter-spacing:0.03em;"></p>
 
 <figure>
 <img src="../figure/zkp.png" alt="Zero-Knowledge Proof concept: Alice (Prover) generates proof from computation and private input; Bob (Verifier) checks the proof without learning private data." style="max-width:520px; width:100%;">
 <figcaption>A zero-knowledge proof lets Alice convince Bob that a computation was performed correctly, without revealing private inputs. The proof $\pi$ is <strong>succinct</strong> (small and fast to verify) and <strong>zero-knowledge</strong> (Bob learns nothing beyond the public output).</figcaption>
 </figure>
+
+<div class="info-box" style="margin-bottom:1.4rem;">
+<strong>Prerequisites.</strong> This document assumes the following background:
+<ul style="margin-top:0.5rem;">
+  <li><strong>Modular arithmetic</strong> — comfortable with $a \bmod p$, greatest common divisors, and basic number theory (covered in any introductory discrete mathematics course).</li>
+  <li><strong>Linear algebra</strong> — vectors, matrices, dot products; used in the ML sections.</li>
+  <li><strong>Polynomials</strong> — polynomial division, roots, and the factor theorem at the high-school level.</li>
+  <li><strong>Probability</strong> — basic probability notation $\Pr[\cdot]$; no measure theory needed.</li>
+  <li><strong>Programming familiarity</strong> — pseudocode and Rust-like syntax appear in examples; no deep Rust knowledge required.</li>
+</ul>
+<strong>Not required:</strong> prior knowledge of cryptography, elliptic curves, or zero-knowledge proofs — these are developed from first principles in Sections 1–4.
+</div>
 
 <p>This project implements <strong>ZK Machine Learning (ZKML)</strong>: running ML algorithms (linear regression, logistic regression, decision trees) inside zero-knowledge circuits. The core challenge is that ZK circuits over the BN254 field natively support only $+$, $-$, $\times$ on unsigned integers&mdash;no fractions, no floats, no transcendental functions. This document builds the mathematical foundations needed to bridge that gap, from finite fields up through the Halo2 proving system to fixed-point ML circuits.</p>
 
@@ -889,7 +974,7 @@ $$e(A, B) \stackrel{?}{=} e([6]G_1,\; G_2).$$
 <p>By bilinearity, the left side equals $e(G_1,G_2)^{ab}$ and the right side equals $e(G_1,G_2)^6$. These are equal if and only if $ab = 6$. You verified the relationship without learning $a$ or $b$.</p>
 </div>
 
-<p>This is exactly how KZG verification works (Section 4): the verifier checks that $q(\tau) \cdot (\tau - z) = f(\tau) - v$ (a polynomial equation in the secret $\tau$) by comparing pairings of curve points that "contain" these values in their exponents.</p>
+<p>This is exactly how KZG verification works (Section 4): the verifier checks that $q(\tau) \cdot (\tau - \zeta) = f(\tau) - v$ (a polynomial equation in the secret $\tau$) by comparing pairings of curve points that "contain" these values in their exponents.</p>
 
 <!-- ════════════════════════════════════════════ -->
 <h2 id="s4">4. Polynomial Commitments (KZG)</h2>
@@ -904,58 +989,64 @@ $$\text{SRS} = \bigl(G_1,\; [\tau]G_1,\; [\tau^2]G_1,\; \dots,\; [\tau^d]G_1,\;\
 
 <h3 id="s4-2">4.2 Commit</h3>
 
-<p>To commit to a polynomial $f(x) = \sum_{i=0}^{d} c_i x^i$, the prover computes:</p>
+<p>To commit to a polynomial $f(X) = \sum_{i=0}^{d} c_i X^i$, the prover computes:</p>
 $$C = [f(\tau)]G_1 = \sum_{i=0}^{d} c_i \cdot [\tau^i]G_1.$$
 <p>The prover can compute this using only the SRS (without knowing $\tau$). The commitment $C$ is a single elliptic curve point&mdash;it is <em>binding</em> (the prover cannot change $f$ after committing) and <em>hiding</em>.</p>
 
 <h3 id="s4-3">4.3 Open and Verify</h3>
 
-<p>Suppose the prover wants to convince the verifier that $f(z) = v$ for a specific point $z$ and value $v$. The protocol has three steps.</p>
+<p>Suppose the prover wants to convince the verifier that $f(\zeta) = v$ for a specific point $\zeta$ and value $v$. The protocol has three steps.</p>
 
 <h4>Step 1: The key algebraic idea</h4>
 
-<p>By the <strong>factor theorem</strong>, $f(z) = v$ if and only if $(x - z)$ divides $f(x) - v$ with no remainder. That is:</p>
+<p>By the <strong>factor theorem</strong>, $f(\zeta) = v$ if and only if $(X - \zeta)$ divides $f(X) - v$ with no remainder. That is:</p>
 
-$$f(z) = v \quad \iff \quad f(x) - v = (x - z) \cdot q(x) \quad \text{for some polynomial } q(x).$$
+$$f(\zeta) = v \quad \iff \quad f(X) - v = (X - \zeta) \cdot q(X) \quad \text{for some polynomial } q(X).$$
 
-<p>We call $q(x)$ the <strong>quotient polynomial</strong>. It has degree $\deg(f) - 1$.</p>
+<p>We call $q(X)$ the <strong>quotient polynomial</strong>. It has degree $\deg(f) - 1$.</p>
+
+<div class="info-box">
+<strong>This is a polynomial identity, not just a point evaluation.</strong> The equation $f(X) - v = (X - \zeta) \cdot q(X)$ holds for <em>every</em> $X \in \mathbb{F}_p$, including the secret $X = \tau$. Substituting gives $f(\tau) - v = (\tau - \zeta) \cdot q(\tau)$, which is precisely what the verifier checks in step 3. The logical flow across the three steps is:
+$$\underbrace{f(\zeta) = v}_{\text{claim}} \;\iff\; \underbrace{f(X) - v = (X-\zeta)\cdot q(X) \;\forall X}_{\text{step 1: polynomial identity}} \;\Rightarrow\; \underbrace{f(\tau) - v = (\tau-\zeta)\cdot q(\tau)}_{\text{step 3: check at } X=\tau \text{ via pairing}}$$
+The last arrow is $\Rightarrow$ rather than $\iff$ because a cheating prover could in principle fabricate values satisfying the equation at $X = \tau$ alone. However, $\tau$ is secret and fixed before the proof, so finding such values is computationally infeasible.
+</div>
 
 <div class="theorem">
 <span class="label">Why? (Factor Theorem)</span>
-Dividing $f(x)$ by $(x - z)$ gives $f(x) = (x - z) \cdot q(x) + r$ where $r$ is a constant. Substituting $x = z$:
-$$f(z) = \underbrace{(z - z)}_{= \, 0} \cdot \, q(z) + r = r.$$
-So the remainder $r$ equals $f(z)$. If $f(z) = v$, then $r = v$, and $f(x) - v = (x-z) \cdot q(x)$ exactly. If $f(z) \neq v$, the remainder $r - v \neq 0$, and no such $q(x)$ exists.
+Dividing $f(X)$ by $(X - \zeta)$ gives $f(X) = (X - \zeta) \cdot q(X) + r$ where $r$ is a constant. Substituting $X = \zeta$:
+$$f(\zeta) = \underbrace{(\zeta - \zeta)}_{= \, 0} \cdot \, q(\zeta) + r = r.$$
+So the remainder $r$ equals $f(\zeta)$. If $f(\zeta) = v$, then $r = v$, and $f(X) - v = (X-\zeta) \cdot q(X)$ exactly. If $f(\zeta) \neq v$, the remainder $r - v \neq 0$, and no such $q(X)$ exists.
 </div>
 
 <h4>Step 2: The prover's work</h4>
 
-<p>The prover computes $q(x)$ (which they can do since they know $f$), and sends its commitment:</p>
-$$\pi = [q(\tau)]G_1 = \sum_i q_i \cdot [\tau^i]G_1.$$
+<p>The prover computes $q(X)$ (which they can do since they know $f$), and sends its KZG commitment (same procedure as Section 4.2):</p>
+$$\pi = [q(\tau)]G_1.$$
 <p>Note: the prover uses the SRS to evaluate $q$ at the secret $\tau$ "in the exponent," just like the original commitment $C$.</p>
 
 <h4>Step 3: The verifier's pairing check</h4>
 
-<p>The verifier needs to check whether $q(\tau) \cdot (\tau - z) = f(\tau) - v$ holds. All three quantities ($q(\tau)$, $\tau$, $f(\tau)$) are hidden in curve points, so the verifier uses a pairing. The check is:</p>
+<p>The verifier needs to check whether $q(\tau) \cdot (\tau - \zeta) = f(\tau) - v$ holds. All three quantities ($q(\tau)$, $\tau$, $f(\tau)$) are hidden in curve points, so the verifier uses a pairing. The check is:</p>
 
-$$e\bigl(\;\pi,\;\; [\tau]G_2 - [z]G_2\;\bigr) \;\stackrel{?}{=}\; e\bigl(\;C - [v]G_1,\;\; G_2\;\bigr)$$
+$$e\bigl(\;\pi,\;\; [\tau]G_2 - [\zeta]G_2\;\bigr) \;\stackrel{?}{=}\; e\bigl(\;C - [v]G_1,\;\; G_2\;\bigr)$$
 
 <p>Let's unpack each side:</p>
 <ul>
-  <li><strong>Left side:</strong> $\pi = [q(\tau)]G_1$ and $[\tau]G_2 - [z]G_2 = [\tau - z]G_2$, so by bilinearity:
-  $$e([q(\tau)]G_1,\; [\tau - z]G_2) = e(G_1, G_2)^{q(\tau)(\tau - z)}.$$</li>
+  <li><strong>Left side:</strong> $\pi = [q(\tau)]G_1$ and $[\tau]G_2 - [\zeta]G_2 = [\tau - \zeta]G_2$, so by bilinearity:
+  $$e([q(\tau)]G_1,\; [\tau - \zeta]G_2) = e(G_1, G_2)^{q(\tau)(\tau - \zeta)}.$$</li>
   <li><strong>Right side:</strong> $C - [v]G_1 = [f(\tau)]G_1 - [v]G_1 = [f(\tau) - v]G_1$, so:
   $$e([f(\tau) - v]G_1,\; G_2) = e(G_1, G_2)^{f(\tau) - v}.$$</li>
 </ul>
 
-<p>The two sides are equal if and only if $q(\tau)(\tau - z) = f(\tau) - v$, which is exactly the polynomial identity from Step 1. The verifier has confirmed $f(z) = v$ without learning $f$, $\tau$, or $q$.</p>
+<p>The two sides are equal if and only if $q(\tau)(\tau - \zeta) = f(\tau) - v$, which is exactly the polynomial identity from Step 1. The verifier has confirmed $f(\zeta) = v$ without learning $f$, $\tau$, or $q$.</p>
 
 <div class="theorem">
 <span class="label">Theorem 4.1 &mdash; KZG Verification Correctness</span>
-The pairing check succeeds if and only if $f(z) = v$. The equivalence chain:
+The pairing check succeeds if and only if $f(\zeta) = v$. The equivalence chain:
 $$\begin{aligned}
-&\underbrace{e(G_1, G_2)^{q(\tau)(\tau - z)}}_{\text{left side}} \;=\; \underbrace{e(G_1, G_2)^{f(\tau) - v}}_{\text{right side}} \\[8pt]
-\iff\quad & q(\tau)\,(\tau - z) \;=\; f(\tau) - v  &\text{(compare exponents)}\\[4pt]
-\iff\quad & f(z) = v  &\text{(factor theorem)}
+&\underbrace{e(G_1, G_2)^{q(\tau)(\tau - \zeta)}}_{\text{left side}} \;=\; \underbrace{e(G_1, G_2)^{f(\tau) - v}}_{\text{right side}} \\[8pt]
+\iff\quad & q(\tau)\,(\tau - \zeta) \;=\; f(\tau) - v  &\text{(compare exponents)}\\[4pt]
+\iff\quad & f(\zeta) = v  &\text{(factor theorem)}
 \end{aligned}$$
 </div>
 
@@ -1222,14 +1313,21 @@ $$\vec{a}_3 = (5, 1, 0, 0, 1), \quad \vec{b}_3 = (1, 0, 0, 0, 0), \quad \vec{c}_
 <p>The computation is laid out in a table with $n$ rows and several types of columns:</p>
 
 <table>
-<thead><tr><th>Column Type</th><th>Symbol</th><th>Role</th></tr></thead>
+<thead><tr><th>Column Type</th><th>Symbol</th><th>Who knows it</th><th>Role</th></tr></thead>
 <tbody>
-<tr><td>Advice</td><td>$a_i$</td><td>Private witness values (the prover fills these)</td></tr>
-<tr><td>Instance</td><td>$x_i$</td><td>Public inputs/outputs (known to both prover &amp; verifier)</td></tr>
-<tr><td>Fixed</td><td>$f_i$</td><td>Constants baked into the circuit (selector values, lookup tables)</td></tr>
-<tr><td>Selector</td><td>$q_i$</td><td>Binary columns that activate/deactivate gates per row</td></tr>
+<tr><td>Advice</td><td>$a_i$</td><td>Prover only</td><td>Private witness values; committed via KZG and opened at $\zeta$ in the proof</td></tr>
+<tr><td>Instance</td><td>$x_i$</td><td>Both</td><td>Public inputs/outputs; verifier evaluates $x_i(\zeta)$ directly — no commitment needed</td></tr>
+<tr><td>Fixed</td><td>$f_i$</td><td>Both</td><td>Arbitrary constants baked in at compile time (e.g. lookup table entries, constant weights); verifier evaluates $f_i(\zeta)$ directly</td></tr>
+<tr><td>Selector</td><td>$q_i$</td><td>Both</td><td>Binary ($0$ or $1$) fixed columns that activate/deactivate gates per row; a special case of fixed columns</td></tr>
 </tbody>
 </table>
+
+<p>All four column types can appear in gate constraint polynomials $g_j(X)$. Their evaluations at $\zeta$ come from different sources during verification:</p>
+<ul>
+  <li>$\{a_i(\zeta)\}$ — received from the prover inside $\pi$ (private, must be proven consistent with the commitments via SHPLONK).</li>
+  <li>$\{x_i(\zeta)\}$ — computed by the verifier directly from the public inputs (not in $\pi$). Used to anchor private computations to declared public values, e.g. $a(\omega^i) - x(\omega^i) = 0$ enforces that a private result equals the public output.</li>
+  <li>$\{f_i(\zeta)\}$, $\{q_i(\zeta)\}$ — computed by the verifier directly from the fixed circuit data (not in $\pi$). Fixed columns hold arbitrary constants; selectors are the binary special case that activate/deactivate individual gates.</li>
+</ul>
 
 <div class="example-box">
 <span class="label">Example &mdash; Arithmetic Gate</span>
@@ -1304,11 +1402,11 @@ The elements $1, \omega, \omega^2, \dots, \omega^{n-1}$ are precisely the $n$ so
 </div>
 
 <div class="info-box">
-<strong>Connection to KZG (Section 4.3):</strong> In KZG, we proved $f(z) = v$ by showing $(x - z)$ divides $f(x) - v$, i.e., one evaluation at one point. Here, we need to prove that a constraint holds at <em>all $n$ rows simultaneously</em>. The idea is the same, but instead of dividing by $(X - z)$ (one root), we divide by $Z_H(X) = X^n - 1$ (all $n$ roots at once).
+<strong>Connection to KZG (Section 4.3):</strong> In KZG, we proved $f(\zeta) = v$ by showing $(X - \zeta)$ divides $f(X) - v$, i.e., one evaluation at one point. Here, we need to prove that a constraint holds at <em>all $n$ rows simultaneously</em>. The idea is the same, but instead of dividing by $(X - \zeta)$ (one root), we divide by $Z_H(X) = X^n - 1$ (all $n$ roots at once).
 </div>
 
 <p>The prover demonstrates this by exhibiting a <strong>quotient polynomial</strong> $t(X)$ such that:</p>
-$$q_M(X) \cdot a(X) \cdot b(X) - c(X) = t(X) \cdot Z_H(X).$$
+$$g(X) \;=\; q_M(X) \cdot a(X) \cdot b(X) - c(X) \;=\; t(X) \cdot Z_H(X).$$
 <p>The verifier then uses KZG to check that this identity holds&mdash;but not by checking every point. Instead, the verifier checks at a <em>single random point</em> $\zeta$. The Schwartz-Zippel lemma explains why this is sufficient.</p>
 
 <h3 id="s6-5">6.5 The Schwartz-Zippel Lemma</h3>
@@ -1462,27 +1560,82 @@ The transcript includes all commitments, public inputs, and any prior challenges
 
 <h3 id="s7-2">7.2 Proof Generation (Prover)</h3>
 
+<p>The prover knows the private witness. It produces a <strong>proof</strong> consisting of the commitments and scalar evaluations listed below, which are appended to a public transcript as they are computed.</p>
+
 <ol>
-  <li><strong>Fill the table:</strong> The prover computes the witness and fills in all advice columns.</li>
+  <li><strong>Fill the table:</strong> The prover computes the witness and fills in all advice columns.
+  <br><em>Output: nothing sent yet; witness stays private.</em></li>
+
   <li><strong>Commit to columns:</strong> Interpolate each advice column into a polynomial and compute KZG commitments:
-  $$C_{a_i} = [a_i(\tau)]G_1.$$</li>
-  <li><strong>Permutation accumulator:</strong> Compute the grand product polynomial $Z(X)$ from Section 6.6 that enforces copy constraints, and commit to it.</li>
-  <li><strong>Construct constraint polynomial:</strong> Combine all gate constraints, lookup arguments, and permutation checks (weighted by random challenges $\alpha, \beta, \gamma$ derived via Fiat-Shamir) into a single polynomial identity:
-  $$\sum_j \alpha^j \cdot g_j(X) \equiv 0 \pmod{Z_H(X)}.$$</li>
-  <li><strong>Compute quotient polynomial:</strong> $t(X) = \frac{\sum_j \alpha^j \cdot g_j(X)}{Z_H(X)}$, and commit to it.</li>
-  <li><strong>Open evaluations:</strong> At a random challenge point $\zeta$ (derived via the Fiat-Shamir transform from Section 7.1), the prover evaluates all polynomials and provides KZG opening proofs.</li>
+  $$C_{a_i} = [a_i(\tau)]G_1.$$
+  <em>Output: commitments $\{C_{a_i}\}$ &mdash; one curve point per advice column &mdash; appended to the transcript.</em></li>
+
+  <li><strong>Permutation accumulator:</strong> Derive random challenges $\beta, \gamma$ via Fiat-Shamir from the transcript so far (i.e. from $\{C_{a_i}\}$). Use them to compute the grand product polynomial $Z(X)$ from Section 6.6 that enforces copy constraints, and commit to it.
+  <br><em>Output: commitment $C_Z = [Z(\tau)]G_1$ appended to the transcript. ($\beta, \gamma$ are derived, not sent.)</em></li>
+
+  <li><strong>Construct constraint polynomial:</strong> Each $g_j(X)$ is one individual constraint polynomial&mdash;a gate constraint (e.g. $q_M(X)\cdot a(X)\cdot b(X) - c(X)$ for a multiplication gate), a lookup argument polynomial, or a permutation check polynomial&mdash;expressed as a polynomial over $\mathbb{F}_p$ that must vanish on every row in $H$. The random challenge $\alpha$ (derived via Fiat-Shamir from the transcript so far) is used to combine them into a single polynomial identity:
+  $$\sum_j \alpha^j \cdot g_j(X) \equiv 0 \pmod{Z_H(X)}.$$
+  The $\alpha^j$ weighting ensures that satisfying the combined sum implies each individual $g_j(X)$ vanishes on $H$ with high probability (by the Schwartz&ndash;Zippel lemma).
+  <br><em>No new output yet; $\alpha$ is derived, not sent.</em></li>
+
+  <li><strong>Compute quotient polynomial:</strong> Compute $t(X) = \frac{\sum_j \alpha^j \cdot g_j(X)}{Z_H(X)}$.
+  Because a degree-$D$ gate makes $g_j(X)$ have degree up to $D(n-1)$, the quotient $t(X)$ has degree up to $(D-1)(n-1)$, which exceeds the SRS maximum degree of $n-1$. To stay within the SRS, split $t(X)$ into $D-1$ chunks of degree $\leq n-1$ by grouping its coefficients:
+  $$t(X) = t_0(X) + X^n \cdot t_1(X) + \cdots + X^{(D-2)n} \cdot t_{D-2}(X).$$
+  Commit to each chunk separately. At challenge point $\zeta$ the verifier reconstructs the full evaluation as $t(\zeta) = t_0(\zeta) + \zeta^n \cdot t_1(\zeta) + \cdots + \zeta^{(D-2)n} \cdot t_{D-2}(\zeta)$.
+  <br><em>Output: commitments $\{C_{t_i} = [t_i(\tau)]G_1\}$ appended to the transcript.</em></li>
+
+  <li><strong>Open evaluations:</strong> At a random challenge point $\zeta$ (derived via the Fiat-Shamir transform from Section 7.1), the prover evaluates all committed polynomials at $\zeta$ (and $\omega\zeta$ for polynomials that need a rotation), and provides a SHPLONK batched opening proof $\pi_{\mathrm{open}}$.
+  <br><em>Output: scalar evaluations $\{a_i(\zeta),\; Z(\zeta),\; Z(\omega\zeta),\; t_i(\zeta),\; \dots\}$ and the opening proof $\pi_{\mathrm{open}}$, all appended to the transcript.</em></li>
 </ol>
+
+<p>The complete proof sent to the verifier is:</p>
+$$\pi \;=\; \Bigl(\;\underbrace{\{C_{a_i}\}}_{\text{step 2}},\; \underbrace{C_Z}_{\text{step 3}},\; \underbrace{\{C_{t_i}\}}_{\text{step 5}},\; \underbrace{\{a_i(\zeta)\},\; Z(\zeta),\; Z(\omega\zeta),\; \{t_i(\zeta)\},\; \pi_{\mathrm{open}}}_{\text{step 6}}\;\Bigr).$$
 
 <h3 id="s7-3">7.3 Verification (Verifier)</h3>
 
+<p>The verifier holds three kinds of data before checking the proof:</p>
+<ul>
+  <li><strong>Proof $\pi$</strong> (from the prover): commitments $\{C_{a_i}\}$, $C_Z$, $\{C_{t_i}\}$, scalar evaluations $\{a_i(\zeta)\}$, $Z(\zeta)$, $Z(\omega\zeta)$, $\{t_i(\zeta)\}$, and opening proof $\pi_{\mathrm{open}}$.</li>
+  <li><strong>Public inputs — instance columns $\{x_i\}$</strong> (known directly, not in $\pi$): the verifier interpolates each $x_i$ into a polynomial $x_i(X)$ and evaluates it at $\zeta$ itself. No commitment or opening proof is needed for instance columns.</li>
+  <li><strong>Circuit data</strong> (fixed at compile time): selector polynomials $\{q_i(X)\}$ and fixed columns $\{f_i(X)\}$, also evaluated at $\zeta$ directly by the verifier.</li>
+</ul>
+<p>The SRS is also public. The verifier holds no private witness.</p>
+
 <ol>
-  <li>Reconstruct the random challenges from the transcript using the Fiat-Shamir transform (Section 7.1).</li>
-  <li>Check the constraint polynomial identity at $\zeta$:
-  $$\sum_j \alpha^j \cdot g_j(\zeta) \stackrel{?}{=} t(\zeta) \cdot Z_H(\zeta).$$</li>
-  <li>Verify all KZG opening proofs using pairing checks.</li>
+  <li><strong>Reconstruct challenges:</strong> Re-run the Fiat-Shamir transcript in the same order as the prover (Section 7.1):
+  hash $\{C_{a_i}\}$ to derive $\beta, \gamma$; hash $C_Z$ to derive $\alpha$; hash $\{C_{t_i}\}$ to derive $\zeta$.
+  Any tampering with the commitments changes the derived challenges and causes the identity check in step 2 to fail.</li>
+  <li><strong>Check the constraint identity at $\zeta$:</strong> Verify:
+  $$\sum_j \alpha^j \cdot g_j(\zeta) \stackrel{?}{=} t(\zeta) \cdot Z_H(\zeta).$$
+  The column evaluations are the <em>inputs</em> to each $g_j(\zeta)$, not $g_j(\zeta)$ itself — each constraint expression combines evaluations from multiple columns. For example, a multiplication gate constraint gives:
+  $$g_j(\zeta) = \underbrace{q_M(\zeta)}_{\text{selector}} \cdot \underbrace{a(\zeta)}_{\text{advice}} \cdot \underbrace{b(\zeta)}_{\text{advice}} - \underbrace{c(\zeta)}_{\text{advice}}$$
+  The same column evaluation (e.g. $q_M(\zeta)$) can appear in multiple $g_j$'s, and one $g_j$ spans columns of different types. The verifier assembles all the inputs from three sources:
+  <ul>
+    <li>received scalars $\{a_i(\zeta)\}$, $Z(\zeta)$, $Z(\omega\zeta)$ — from $\pi$ (private witness evaluations);</li>
+    <li>$\{x_i(\zeta)\}$ — computed directly from the public instance columns (not in $\pi$);</li>
+    <li>$\{q_i(\zeta)\}$, $\{f_i(\zeta)\}$ — computed directly from the fixed circuit data.</li>
+  </ul>
+  It also computes $Z_H(\zeta) = \zeta^n - 1$ directly and reconstructs $t(\zeta)$ from the received chunk evaluations:
+  $$t(\zeta) = t_0(\zeta) + \zeta^n \cdot t_1(\zeta) + \cdots + \zeta^{(D-2)n} \cdot t_{D-2}(\zeta).$$
+  This step is <strong>purely finite field arithmetic</strong> in $\mathbb{F}_p$ — no elliptic curve points appear. The commitments $\{C_{a_i}\}$, $C_Z$, $\{C_{t_i}\}$ are not used here; they are only needed in step 3.</li>
+  <li><strong>Verify opening proofs:</strong> This step extends the basic KZG pairing check from Section 4.3 to all polynomials at once using SHPLONK.
+
+  <p>Let $\{p_i\}$ denote all committed polynomials ($\{a_i\}$, $Z$, $\{t_i\}$) with commitments $\{C_i\}$. Each $p_i$ is opened at a set $\mathcal{O}_i \subseteq \{\zeta,\, \omega\zeta\}$ with claimed evaluations forming a remainder polynomial $r_i(X)$ — a constant if $|\mathcal{O}_i|=1$, or a line through the two claimed values if $|\mathcal{O}_i|=2$.</p>
+
+  <ol type="a">
+    <li><strong>Derive batching challenge $y$</strong> via Fiat-Shamir from the transcript.</li>
+    <li><strong>Compute the batched commitment</strong> using $y$ and the claimed scalar evaluations:
+    $$F = \sum_i y^i \cdot \bigl(C_i - [r_i(\tau)]G_1\bigr),$$
+    where $[r_i(\tau)]G_1$ is computed from the SRS using the claimed scalars (no knowledge of $\tau$ needed).</li>
+    <li><strong>Single pairing check:</strong> Check:
+    $$e\!\left(\pi_{\mathrm{open}},\;\; [(\tau-\zeta)(\tau-\omega\zeta)]G_2\right) \stackrel{?}{=} e\!\left(F,\;\; G_2\right).$$
+    The two sides are equal if and only if every claimed evaluation is genuine.</li>
+  </ol>
+
+  <p>Without this check, a cheating prover could send false scalars that satisfy the identity in step 2 but do not correspond to any valid witness.</p></li>
 </ol>
 
-<p>This project uses the <strong>SHPLONK</strong> multi-opening strategy, which batches multiple polynomial openings into a single pairing check for efficiency.</p>
+<p>This project uses the <strong>SHPLONK</strong> multi-opening strategy, which batches all polynomial openings into a single pairing check for efficiency.</p>
 
 <h3 id="s7-4">7.4 Circuit Parameters</h3>
 
@@ -1875,6 +2028,7 @@ $$\text{Split cost} = \frac{|S_L|}{|S|} \cdot \text{Gini}(S_L) + \frac{|S_R|}{|S
   <li>Axiom. <em>halo2-lib documentation.</em> <a href="https://docs.axiom.xyz/protocol/zero-knowledge-proofs/getting-started-with-halo2">https://docs.axiom.xyz</a></li>
   <li>Barreto, P. &amp; Naehrig, M. (2005). <em>Pairing-Friendly Elliptic Curves of Prime Order.</em> (BN curves.)</li>
   <li>Remez, E. (1934). <em>Sur la d&eacute;termination des polyn&ocirc;mes d'approximation de degr&eacute; donn&eacute;e.</em> Comm. Soc. Math. Kharkov.</li>
+  <li><em>Halo2 KZG &amp; SHPLONK — Proof Generation and Verification Walkthrough.</em> HackMD community note. <a href="https://hackmd.io/JaoTzYgqSY6lXDN4C5alXQ" target="_blank" rel="noopener">https://hackmd.io/JaoTzYgqSY6lXDN4C5alXQ</a></li>
 </ol>
 
 <footer>
@@ -1960,6 +2114,94 @@ function closeSidebar() {
       li.classList.toggle('expanded');
     });
   });
+})();
+
+// --- Reading Progress Bar ---
+(function() {
+  var bar   = document.getElementById('progress-bar');
+  var label = document.getElementById('progress-label');
+  var hideTimer;
+
+  // --- Word count setup ---
+  // Collect all text-bearing leaf nodes inside <main> (excludes script/style)
+  var mainEl = document.querySelector('main') || document.body;
+
+  function countWords(str) {
+    return (str.match(/\S+/g) || []).length;
+  }
+
+  // Build an array of { node, top, words } sorted by vertical position
+  var nodeData = [];
+  var walker = document.createTreeWalker(mainEl, NodeFilter.SHOW_TEXT, {
+    acceptNode: function(n) {
+      var tag = n.parentElement && n.parentElement.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE') return NodeFilter.FILTER_REJECT;
+      if (!n.nodeValue.trim()) return NodeFilter.FILTER_SKIP;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  var node;
+  while ((node = walker.nextNode())) {
+    var range = document.createRange();
+    range.selectNode(node);
+    var rect = range.getBoundingClientRect();
+    nodeData.push({
+      top: rect.top + window.scrollY,
+      words: countWords(node.nodeValue)
+    });
+  }
+  // sort top-to-bottom (getBoundingClientRect on text nodes is usually already ordered)
+  nodeData.sort(function(a, b) { return a.top - b.top; });
+
+  var totalWords = nodeData.reduce(function(s, d) { return s + d.words; }, 0);
+
+  // Technical math content: ~80 wpm to read and understand
+  var WPM = 80;
+
+  function fmt(n) { return n.toLocaleString(); }
+
+  function fmtTime(words) {
+    var mins = words / WPM;
+    if (mins < 1)   return '< 1 min';
+    if (mins < 60)  return Math.round(mins) + ' min';
+    var h = Math.floor(mins / 60);
+    var m = Math.round(mins % 60);
+    return h + ' hr' + (m > 0 ? ' ' + m + ' min' : '');
+  }
+
+  // Populate static reading-time estimate at the top of the article
+  var metaEl = document.getElementById('reading-meta');
+  if (metaEl) {
+    metaEl.textContent = fmt(totalWords) + ' words · estimated ' + fmtTime(totalWords) + ' to read and understand (at ~' + WPM + ' wpm for technical content)';
+  }
+
+  function update() {
+    var scrollTop = window.scrollY || document.documentElement.scrollTop;
+    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = docHeight > 0 ? Math.min(100, Math.round(scrollTop / docHeight * 100)) : 0;
+
+    // count words above the bottom of the viewport
+    var viewBottom = scrollTop + window.innerHeight;
+    var readWords = 0;
+    for (var i = 0; i < nodeData.length; i++) {
+      if (nodeData[i].top <= viewBottom) readWords += nodeData[i].words;
+      else break;
+    }
+    readWords = Math.min(readWords, totalWords);
+
+    bar.style.width = pct + '%';
+    label.textContent = pct + '% · ' + fmt(readWords) + ' / ' + fmt(totalWords) + ' words';
+
+    label.classList.add('visible');
+    clearTimeout(hideTimer);
+    if (pct < 100) {
+      hideTimer = setTimeout(function() { label.classList.remove('visible'); }, 1800);
+    }
+  }
+
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update, { passive: true });
+  update();
 })();
 </script>
 
