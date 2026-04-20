@@ -72,9 +72,6 @@ fn main() {
     set_var("DEGREE", 13.to_string());
 
     // run mock prover
-    // mock(some_algorithm_in_zk, -12.0);
-    // mock(some_algorithm_in_zk, -1.88724767676867);
-    // mock(some_algorithm_in_zk, 0.0);
     // mock(some_algorithm_in_zk, 1.0);
     // mock(some_algorithm_in_zk, 1.128);
     // mock(some_algorithm_in_zk, 2.0);
