@@ -936,17 +936,18 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         a: impl IntoIterator<Item = QA>,
         b: impl IntoIterator<Item = QA>
     ) -> AssignedValue<F>
-    where 
+    where
         F: BigPrimeField, QA: Into<QuantumCell<F>> + Copy
     {
         let a: Vec<QA> = a.into_iter().collect();
         let b: Vec<QA> = b.into_iter().collect();
         assert!(a.len() == b.len());
-        let mut res = self.qadd(ctx, Constant(F::zero()), Constant(F::zero()));
+        let mut res_s = ctx.load_witness(F::zero());
+        self.gate().assert_is_const(ctx, &res_s, &F::zero());
         for (ai, bi) in a.iter().zip(b.iter()).into_iter() {
-            let ai_bi = self.qmul(ctx, *ai, *bi);
-            res = self.qadd(ctx, res, ai_bi);
+            res_s = self.gate().mul_add(ctx, *ai, *bi, res_s);
         }
+        let (res, _) = self.signed_div_scale(ctx, res_s);
 
         res
     }
@@ -1100,9 +1101,14 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
 
         self.range_gate().check_big_less_than_safe(ctx, rem, b);
         // a < 2^{4p}, b = 2^p, so |q| < 2^{3p}
-        let bound = BigUint::from(2u32).pow(PRECISION_BITS * 3 as u32);
-        let div_abs = self.qabs(ctx, div);
-        self.range_gate().check_big_less_than_safe(ctx, div_abs, bound);
+        // Use offset trick to avoid expensive qabs: translate q by 2^{3p}-1
+        // so that [-(2^{3p}-1), 2^{3p}-1] maps to [0, 2^{3p+1}-2]
+        let abs_bound = BigUint::from(2u32).pow(PRECISION_BITS * 3 as u32);
+        let abs_bound_minus1 = abs_bound.clone() - BigUint::from(1u32);
+        let new_bound = abs_bound * BigUint::from(2u32) - BigUint::from(1u32);
+        let div_plus_offset =
+            self.gate().add(ctx, div, Constant(biguint_to_fe(&abs_bound_minus1)));
+        self.range_gate().check_big_less_than_safe(ctx, div_plus_offset, new_bound);
 
         (div, rem)
     }
