@@ -10,12 +10,27 @@ use num_integer::Integer;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FixedPointStrategy {
-    Vertical, // vanilla implementation with vertical basic gate(s)
+    /// Vanilla implementation using vertical basic gate(s).
+    Vertical,
 }
 
-/// `PRECISION_BITS` indicates the precision of integer and fractional parts.
-/// For example, `PRECISION_BITS = 32` indicates this chip implements 32.32 fixed point decimal arithmetics.
-/// The valid range of the fixed point decimal is -max_value < x < max_value.
+/// A ZK-friendly fixed-point arithmetic chip over the BN254 scalar field.
+///
+/// `PRECISION_BITS` (P) controls both integer and fractional width: P.P format.
+/// For example, `PRECISION_BITS = 32` gives 32.32 fixed-point (64-bit total),
+/// and `PRECISION_BITS = 63` gives 63.63 fixed-point (126-bit total).
+///
+/// # Representation
+/// - Real value `x` is stored as `x_q = round(x * 2^P)` in the field.
+/// - Negative values use modular representation: `-x` is stored as `p - x_q` where `p` is the BN254 prime.
+/// - Valid range: `(-2^{2P}, 2^{2P})`.
+///
+/// # Precision
+/// The `qexp2` and `qlog2` functions use Higher-Precision (HP) polynomial evaluation
+/// with `EXTRA_PRECISION_BITS` (K=20) extra internal bits to achieve >= P bits of
+/// precision (max 1 ULP error) for both P=32 and P=63 configurations.
+/// Coefficients are pre-computed with 100 decimal digits of precision using Chebyshev
+/// approximation, avoiding the ~52-bit limitation of f64.
 #[derive(Clone, Debug)]
 pub struct FixedPointChip<F: BigPrimeField, const PRECISION_BITS: u32> {
     strategy: FixedPointStrategy,
@@ -101,8 +116,16 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BI
         x_deq
     }
 
+    /// Extra bits used for Higher-Precision (HP) polynomial evaluation.
+    /// During Horner evaluation, each multiply-then-truncate step loses ~1 ULP.
+    /// With degree-d polynomial, this accumulates to ~d ULPs at P-bit precision.
+    /// By working at (P+K)-bit precision internally and truncating once at the end,
+    /// the per-step error becomes negligible at P-bit scale.
+    /// K=20 keeps intermediates within BN254: 2*(P+K) = 2*(63+20) = 166 < 254.
     const EXTRA_PRECISION_BITS: u32 = 20;
 
+    /// Convert a signed i128 coefficient to a field element.
+    /// Negative values are represented as `p - |val|` in the BN254 field.
     fn quantize_i128(&self, val: i128) -> F {
         if val >= 0 {
             biguint_to_fe(&BigUint::from(val as u128))
@@ -111,6 +134,10 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BI
         }
     }
 
+    /// Chebyshev polynomial coefficients for exp2(t) on [0, 1] at HP scale (2^{P+K}).
+    /// Pre-quantized as integers with mpmath (100 decimal digits precision).
+    /// - P<=32: degree 12 (13 terms), HP_SCALE=2^52, verified >= 32 bits precision
+    /// - P>32:  degree 16 (17 terms), HP_SCALE=2^83, verified >= 63 bits precision
     fn generate_exp2_poly_hp(&self) -> Vec<QuantumCell<F>> {
         let coef_i128: Vec<i128> = if PRECISION_BITS <= 32 {
             // degree 12, HP_SCALE=2^52
@@ -135,6 +162,12 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BI
         coef_i128.iter().map(|&c| Constant(self.quantize_i128(c))).collect()
     }
 
+    /// Chebyshev polynomial coefficients for log2(1+t) on [0, 1] at HP scale (2^{P+K}).
+    /// Used in qlog2: after normalizing input to [2, 4), substitute t = x/2 - 1 so t in [0, 1),
+    /// then log2(x) = 1 + poly(t).
+    /// Pre-quantized as integers with mpmath (100 decimal digits precision).
+    /// - P<=32: degree 22 (23 terms), HP_SCALE=2^52, verified >= 32 bits precision
+    /// - P>32:  degree 29 (30 terms), HP_SCALE=2^83, verified >= 63 bits precision
     fn generate_log_poly_hp(&self) -> Vec<QuantumCell<F>> {
         let coef_i128: Vec<i128> = if PRECISION_BITS <= 32 {
             // degree 22, HP_SCALE=2^52
@@ -188,11 +221,15 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointChip<F, PRECISION_BI
     }
 }
 
+/// Trait defining fixed-point decimal arithmetic operations in ZK circuits.
+///
+/// All operations work on values in P.P fixed-point format where P = `PRECISION_BITS`.
+/// Values are quantized as `x_q = round(x * 2^P)` and stored as BN254 field elements.
+///
+/// # References
+/// - [FixPointCS](https://github.com/XMunkki/FixPointCS/blob/c701f57c3cfe6478d1f6fd7578ae040c59386b3d/Cpp/Fixed64.h)
+/// - [ABDKMath64x64](https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol)
 pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
-    /// Fixed point decimal and its arithmetic functions.
-    /// [ref] https://github.com/XMunkki/FixPointCS/blob/c701f57c3cfe6478d1f6fd7578ae040c59386b3d/Cpp/Fixed64.h
-    /// [ref] https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol
-    ///
     type Gate: GateInstructions<F>;
     type RangeGate: RangeInstructions<F>;
 
@@ -200,40 +237,49 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     fn range_gate(&self) -> &Self::RangeGate;
     fn strategy(&self) -> FixedPointStrategy;
 
+    /// Returns the absolute value of `a`. Expensive: calls `is_neg` internally.
     fn qabs(&self, ctx: &mut Context<F>, a: impl Into<QuantumCell<F>>) -> AssignedValue<F>
-    where 
+    where
         F: BigPrimeField;
 
+    /// Returns 1 if `a` represents a negative fixed-point value, 0 otherwise.
+    /// Expensive: uses a 254-bit `div_mod` to check the sign bit.
     fn is_neg(&self, ctx: &mut Context<F>, a: impl Into<QuantumCell<F>>) -> AssignedValue<F>
-    where 
+    where
         F: BigPrimeField;
 
+    /// Returns +1 or -1 (as field elements) depending on the sign of `a`.
     fn sign(&self, ctx: &mut Context<F>, a: impl Into<QuantumCell<F>>) -> AssignedValue<F>
-    where 
+    where
         F: BigPrimeField;
 
+    /// Conditionally negates `a` based on the boolean `is_neg` flag.
     fn cond_neg(
         &self, ctx: &mut Context<F>, a: impl Into<QuantumCell<F>>, is_neg: AssignedValue<F> 
     ) -> AssignedValue<F>
     where 
         F: BigPrimeField;
 
-    /// clip the value to ensure it's in the valid range: (-2^p, 2^p), i.e., simulate overflow
-    /// Warning: assuome a < 2^{p+1},This may fail silently if a is too large
-    /// (e.g., mul of two large number leads to 2^{2p}).
+    /// Clip the value to ensure it's in the valid range: (-2^{2P}, 2^{2P}).
+    /// Warning: assumes a < 2^{2P+1}. May fail silently for larger values.
     fn clip(&self, ctx: &mut Context<F>, a: impl Into<QuantumCell<F>>) -> AssignedValue<F>
     where 
         F: BigPrimeField;
 
+    /// Evaluate a polynomial using Horner's method at P-bit fixed-point precision.
+    /// `coef` is in Horner order: `[c_d, c_{d-1}, ..., c_1, c_0]` for `c_d*x^d + ... + c_0`.
+    /// Each step does `y = y*x + c` via `qmul` (which truncates by 2^P per multiply).
+    /// Accumulated truncation error: ~d ULPs. Use `polynomial_hp` for >= P-bit accuracy.
     fn polynomial<QA>(
         &self,
         ctx: &mut Context<F>,
         x: impl Into<QuantumCell<F>>,
         coef: impl IntoIterator<Item = QA>
     ) -> AssignedValue<F>
-    where 
+    where
         F: BigPrimeField, QA: Into<QuantumCell<F>> + Debug + Copy;
 
+    /// XOR of two single-bit values. Both inputs must be 0 or 1.
     fn bit_xor(
         &self,
         ctx: &mut Context<F>,
@@ -272,6 +318,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
         self.gate().neg(ctx, a)
     }
 
+    /// Fixed-point addition. Direct field addition (no overflow check).
     fn qadd(
         &self,
         ctx: &mut Context<F>,
@@ -281,6 +328,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Fixed-point subtraction. Direct field subtraction (no overflow check).
     fn qsub(
         &self,
         ctx: &mut Context<F>,
@@ -290,6 +338,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
     
+    /// Fixed-point multiplication: computes `a * b / 2^P` via `signed_div_scale`.
     fn qmul(
         &self,
         ctx: &mut Context<F>,
@@ -299,6 +348,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
     
+    /// Fixed-point division: computes `(a * 2^P) / b`.
     fn qdiv(
         &self,
         ctx: &mut Context<F>,
@@ -308,6 +358,10 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
     
+    /// Fixed-point inner product: computes `sum(a_i * b_i) / 2^P`.
+    /// Batches all multiplications before a single `signed_div_scale`, reducing
+    /// circuit cost from ~90*N to ~N+90 cells compared to N separate `qmul` calls.
+    /// Warning: the accumulated sum must fit in the BN254 field (~254 bits).
     fn inner_product<QA>(
         &self,
         ctx: &mut Context<F>,
@@ -317,6 +371,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField, QA: Into<QuantumCell<F>> + Copy;
 
+    /// Fixed-point modulo: `a mod b` where `b > 0`. Result has same sign convention as remainder.
     fn qmod(
         &self,
         ctx: &mut Context<F>,
@@ -326,7 +381,9 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
-    /// exp2
+    /// Computes 2^a using HP polynomial evaluation. Precision: >= P bits (max 1 ULP).
+    /// Splits input into integer and fractional parts: 2^a = 2^int * poly(frac).
+    /// For negative inputs: 2^(-|a|) = 1 / 2^|a|.
     fn qexp2(
         &self,
         ctx: &mut Context<F>,
@@ -335,7 +392,9 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
-    /// log
+    /// Computes log2(a) for a > 0 using HP polynomial evaluation. Precision: >= P bits (max 1 ULP).
+    /// Normalizes input to [2, 4) at HP scale (avoiding right-shift truncation),
+    /// then evaluates log2(1+t) Chebyshev polynomial where t = normalized/2 - 1.
     fn qlog2(
         &self,
         ctx: &mut Context<F>,
@@ -344,7 +403,8 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
  
-    /// sin
+    /// Computes sin(a) using polynomial approximation on [0, pi].
+    /// Reduces input modulo 2*pi, then uses symmetry for [pi, 2*pi).
     fn qsin(
         &self,
         ctx: &mut Context<F>,
@@ -353,6 +413,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Computes cos(a) = sin(a + pi/2).
     fn qcos(
         &self,
         ctx: &mut Context<F>,
@@ -361,10 +422,13 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Constrains that `pow2_exponent == 2^exponent` by checking the bit decomposition
+    /// has exactly one set bit at position `exponent`.
     fn check_power_of_two(&self, ctx: &mut Context<F>, pow2_exponent: AssignedValue<F>, exponent: AssignedValue<F>)
     where
         F: BigPrimeField;
 
+    /// Computes tan(a) = sin(a) / cos(a).
     fn qtan(
         &self,
         ctx: &mut Context<F>,
@@ -381,6 +445,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
         y
     }
 
+    /// Computes e^a = 2^(a / ln(2)).
     fn qexp(
         &self,
         ctx: &mut Context<F>,
@@ -390,6 +455,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
         F: BigPrimeField;
 
 
+    /// Computes sinh(a) = (e^a - e^{-a}) / 2.
     fn qsinh(
         &self,
         ctx: &mut Context<F>,
@@ -398,6 +464,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
     
+    /// Computes cosh(a) = (e^a + e^{-a}) / 2.
     fn qcosh(
         &self,
         ctx: &mut Context<F>,
@@ -406,6 +473,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
     
+    /// Computes tanh(a) = sinh(a) / cosh(a).
     fn qtanh(
         &self,
         ctx: &mut Context<F>,
@@ -422,6 +490,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
         y
     }
 
+    /// Returns max(a, b).
     fn qmax(
         &self,
         ctx: &mut Context<F>,
@@ -431,6 +500,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Returns min(a, b).
     fn qmin(
         &self,
         ctx: &mut Context<F>,
@@ -440,6 +510,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Computes ln(a) = log2(a) / log2(e).
     fn qlog(
         &self,
         ctx: &mut Context<F>,
@@ -448,6 +519,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Computes x^exponent = exp(exponent * ln(x)).
     fn qpow(
         &self,
         ctx: &mut Context<F>,
@@ -465,6 +537,7 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
         y
     }
 
+    /// Computes sqrt(x) = x^0.5 via qpow.
     fn qsqrt(
         &self,
         ctx: &mut Context<F>,
@@ -473,12 +546,19 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where 
         F: BigPrimeField;
 
+    /// Divide `a` by the quantization scale `2^P`, returning `(quotient, remainder)`.
+    /// Constrains: `a = 2^P * q + r` with `0 <= r < 2^P` and `|q| < 2^{3P}`.
+    /// Uses an offset trick to avoid expensive `qabs`: translates `q` by `2^{3P}-1`
+    /// and does a single range check, reducing cells from ~250 to ~90.
     fn signed_div_scale(
         &self,
         ctx: &mut Context<F>,
         a: impl Into<QuantumCell<F>>
     ) -> (AssignedValue<F>, AssignedValue<F>);
 
+    /// Generalized signed division by `2^{pow_bits}`, returning `(quotient, remainder)`.
+    /// Constrains: `a = 2^{pow_bits} * q + r` with `0 <= r < 2^{pow_bits}` and `|q| < 2^{max_quotient_bits}`.
+    /// Used by HP polynomial evaluation for intermediate divisions at (P+K)-bit scale.
     fn signed_div_by_pow2(
         &self,
         ctx: &mut Context<F>,
@@ -489,6 +569,10 @@ pub trait FixedPointInstructions<F: ScalarField, const PRECISION_BITS: u32> {
     where
         F: BigPrimeField;
 
+    /// Higher-Precision polynomial evaluation using Horner's method.
+    /// Scales `x` up by `2^K` internally, evaluates at (P+K)-bit precision, then truncates back.
+    /// Coefficients must be pre-quantized at `2^{P+K}` scale (use `generate_*_poly_hp`).
+    /// Achieves <= 1 ULP error at P-bit scale (vs ~d ULPs for standard `polynomial`).
     fn polynomial_hp<QA>(
         &self,
         ctx: &mut Context<F>,
@@ -515,6 +599,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         self.strategy
     }
 
+    /// Fixed-point addition. Direct field addition (no overflow check).
     fn qadd(
         &self,
         ctx: &mut Context<F>,
@@ -527,6 +612,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         self.gate().add(ctx, a, b)
     }
 
+    /// Fixed-point subtraction. Direct field subtraction (no overflow check).
     fn qsub(
         &self,
         ctx: &mut Context<F>,
@@ -609,6 +695,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         clipped
     }
 
+    /// Fixed-point multiplication: computes `a * b / 2^P` via `signed_div_scale`.
     fn qmul(
         &self,
         ctx: &mut Context<F>,
@@ -627,6 +714,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         res
     }
 
+    /// Fixed-point modulo: `a mod b` where `b > 0`. Result has same sign convention as remainder.
     fn qmod(
         &self,
         ctx: &mut Context<F>,
@@ -654,6 +742,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         res
     }
 
+    /// Fixed-point division: computes `(a * 2^P) / b`.
     fn qdiv(
         &self,
         ctx: &mut Context<F>,
@@ -711,6 +800,8 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         result
     }
 
+    /// Constrains that `pow2_exponent == 2^exponent` by checking the bit decomposition
+    /// has exactly one set bit at position `exponent`.
     fn check_power_of_two(&self, ctx: &mut Context<F>, pow2_exponent: AssignedValue<F>, exponent: AssignedValue<F>)
     where
         F: BigPrimeField,
@@ -915,6 +1006,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         sin_a
     }
 
+    /// Computes cos(a) = sin(a + pi/2).
     fn qcos(
         &self,
         ctx: &mut Context<F>,
@@ -930,6 +1022,10 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Fixed-point inner product: computes `sum(a_i * b_i) / 2^P`.
+    /// Batches all multiplications before a single `signed_div_scale`, reducing
+    /// circuit cost from ~90*N to ~N+90 cells compared to N separate `qmul` calls.
+    /// Warning: the accumulated sum must fit in the BN254 field (~254 bits).
     fn inner_product<QA>(
         &self,
         ctx: &mut Context<F>,
@@ -952,6 +1048,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         res
     }
 
+    /// Computes e^a = 2^(a / ln(2)).
     fn qexp(
         &self,
         ctx: &mut Context<F>,
@@ -968,6 +1065,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Computes sinh(a) = (e^a - e^{-a}) / 2.
     fn qsinh(
         &self,
         ctx: &mut Context<F>,
@@ -987,6 +1085,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Computes cosh(a) = (e^a + e^{-a}) / 2.
     fn qcosh(
         &self,
         ctx: &mut Context<F>,
@@ -1006,6 +1105,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Returns max(a, b).
     fn qmax(
         &self,
         ctx: &mut Context<F>,
@@ -1024,6 +1124,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Returns min(a, b).
     fn qmin(
         &self,
         ctx: &mut Context<F>,
@@ -1042,6 +1143,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Computes ln(a) = log2(a) / log2(e).
     fn qlog(
         &self,
         ctx: &mut Context<F>,
@@ -1058,6 +1160,7 @@ impl<F: BigPrimeField, const PRECISION_BITS: u32> FixedPointInstructions<F, PREC
         y
     }
 
+    /// Computes sqrt(x) = x^0.5 via qpow.
     fn qsqrt(
         &self,
         ctx: &mut Context<F>,
