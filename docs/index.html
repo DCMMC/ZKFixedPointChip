@@ -644,7 +644,7 @@ ol.reference-list li:last-child { border-bottom: none; }
 <p id="reading-meta" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:0.8rem;color:var(--dim);margin-top:0.4rem;letter-spacing:0.03em;"></p>
 
 <figure>
-<img src="../figure/zkp.png" alt="Zero-Knowledge Proof concept: Alice (Prover) generates proof from computation and private input; Bob (Verifier) checks the proof without learning private data." style="max-width:520px; width:100%;">
+<img src="figure/zkp.png" alt="Zero-Knowledge Proof concept: Alice (Prover) generates proof from computation and private input; Bob (Verifier) checks the proof without learning private data." style="max-width:520px; width:100%;">
 <figcaption>A zero-knowledge proof lets Alice convince Bob that a computation was performed correctly, without revealing private inputs. The proof $\pi$ is <strong>succinct</strong> (small and fast to verify) and <strong>zero-knowledge</strong> (Bob learns nothing beyond the public output).</figcaption>
 </figure>
 
@@ -1658,7 +1658,7 @@ $$\pi \;=\; \Bigl(\;\underbrace{\{C_{a_i}\}}_{\text{step 2}},\; \underbrace{C_Z}
 <p>Finite fields have no fractions&mdash;there is no $0.5$ in $\mathbb{F}_p$. To do machine learning (which needs decimal numbers), this project uses <strong>fixed-point quantization</strong>: represent real numbers as scaled integers.</p>
 
 <figure>
-<img src="../figure/workflow_fixed_point_sanity_check.png" alt="FixedPointChip workflow: real input is quantized into a BN254 field element, computed inside the ZK circuit, then dequantized back to a real number." style="max-width:480px; width:100%;">
+<img src="figure/workflow_fixed_point_sanity_check.png" alt="FixedPointChip workflow: real input is quantized into a BN254 field element, computed inside the ZK circuit, then dequantized back to a real number." style="max-width:480px; width:100%;">
 <figcaption>The FixedPointChip pipeline: a real number (e.g., $\pi/4$) is <strong>quantized</strong> into a field element, processed by the ZK circuit (e.g., $\sin$), then <strong>dequantized</strong> back. The hex values are BN254 field elements.</figcaption>
 </figure>
 
@@ -1701,7 +1701,7 @@ This large number, when subtracted from $p$ in the field, recovers $\pi_q$.
 </div>
 
 <figure>
-<img src="../figure/quantization.png" alt="Quantization scheme and BN254 number line showing positive numbers in the lower range and negative numbers wrapping around from M." style="max-width:380px; width:100%;">
+<img src="figure/quantization.png" alt="Quantization scheme and BN254 number line showing positive numbers in the lower range and negative numbers wrapping around from M." style="max-width:380px; width:100%;">
 <figcaption>Symmetric quantization with the BN254 number line. Positive values occupy $[0, 2^{2P}-1]$; negative values wrap around from the top of the field, occupying $[p - 2^{2P}, p-1]$. The gap in the middle is unused.</figcaption>
 </figure>
 
@@ -2233,7 +2233,7 @@ $$w_i \leftarrow w_i - \frac{\eta}{m} \cdot \sum_{j=1}^m e^{(j)} x_i^{(j)}, \qqu
 </div>
 
 <figure>
-<img src="../figure/demo_linear_regression_train.png" alt="ZK linear regression training: loss curve showing ZK and non-ZK versions converge with negligible error, alongside proof generation terminal output." style="max-width:680px; width:100%;">
+<img src="figure/demo_linear_regression_train.png" alt="ZK linear regression training: loss curve showing ZK and non-ZK versions converge with negligible error, alongside proof generation terminal output." style="max-width:680px; width:100%;">
 <figcaption>ZK linear regression training demo. Left: the loss curve (ZK version in blue dashed, non-ZK in red solid) converges with negligible error. Right: Halo2 proof generation and verification output&mdash;proving takes ~23s, verification ~120ms.</figcaption>
 </figure>
 
@@ -2332,7 +2332,7 @@ $$\text{tree}[5k + 0] = \text{data\_slot}_k, \quad \text{tree}[5k+1] = \text{spl
 </div>
 
 <figure>
-<img src="../figure/decision_tree_inference.png" alt="Decision tree inference with path padding: variable-length paths are padded to equal length via self-loops at leaf nodes. Fake nodes (blue dashed) complete the binary tree." style="max-width:420px; width:100%;">
+<img src="figure/decision_tree_inference.png" alt="Decision tree inference with path padding: variable-length paths are padded to equal length via self-loops at leaf nodes. Fake nodes (blue dashed) complete the binary tree." style="max-width:420px; width:100%;">
 <figcaption>ZK-friendly tree traversal. <strong>Self-loops</strong>: leaf nodes point to themselves so all paths have equal circuit length. <strong>Fake nodes</strong> (blue dashed): added to make the tree a complete binary tree&mdash;they are never reached due to the self-loops at real leaf nodes (yellow).</figcaption>
 </figure>
 
@@ -2407,7 +2407,7 @@ $$\text{Gini}(S) = 1 - \sum_{k=0}^{K-1} \left(\frac{n_k}{n}\right)^2, \qquad \te
 </ol>
 
 <figure>
-<img src="../figure/demo_decision_tree.png" alt="ZK decision tree training demo: generated tree visualization with splitting nodes (green), leaf nodes (yellow), and fake nodes (blue dashed), alongside proof verification output." style="max-width:680px; width:100%;">
+<img src="figure/demo_decision_tree.png" alt="ZK decision tree training demo: generated tree visualization with splitting nodes (green), leaf nodes (yellow), and fake nodes (blue dashed), alongside proof verification output." style="max-width:680px; width:100%;">
 <figcaption>ZK decision tree training demo. Left: the generated tree (green = split nodes, yellow = leaves, blue dashed = fake nodes). Right: Rust code and Halo2 proof output confirming the ZK proof is valid.</figcaption>
 </figure>
 
